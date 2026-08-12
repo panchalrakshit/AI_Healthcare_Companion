@@ -1,23 +1,22 @@
-import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/Patient_dashboard.dart';
-import 'package:ai_healthcompanion_using_flutter/features/auth/login/signup.dart';
 import 'package:flutter/material.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  // Password visibility
+class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
-  // Selected login role
   String _selectedRole = 'Patient';
 
-  // Available roles
-  final List<String> _roles = ['Patient', 'Doctor'];
+  final List<String> _roles = [
+    'Patient',
+    'Doctor',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -44,61 +43,55 @@ class _LoginScreenState extends State<LoginScreen> {
                 // LOGO
                 // =========================================================
 
-                Center(
-                  child: Container(
-                    height: 56,
-                    width: 56,
+                Container(
+                  height: 56,
+                  width: 56,
 
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF222222),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF222222),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
 
-                    child: const Icon(
-                      Icons.healing_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+                  child: const Icon(
+                    Icons.health_and_safety,
+                    color: Colors.white,
+                    size: 32,
                   ),
                 ),
 
-                const SizedBox(height: 45),
+                const SizedBox(height: 40),
 
                 // =========================================================
                 // HEADING
                 // =========================================================
 
-                Center(
-                  child: const Text(
-                    "Welcome Back!",
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF202020),
-                    ),
+                const Text(
+                  "Create Account",
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF202020),
                   ),
                 ),
 
                 const SizedBox(height: 8),
 
-                Center(
-                  child: const Text(
-                    "Login to continue to Healthcare Companion",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF999999),
-                    ),
+                const Text(
+                  "Create your Healthcare Companion account",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF999999),
                   ),
                 ),
 
-                const SizedBox(height: 35),
+                const SizedBox(height: 32),
 
                 // =========================================================
-                // LOGIN AS
+                // ACCOUNT TYPE
                 // =========================================================
 
                 const Text(
-                  "Login As",
+                  "Account Type",
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -108,14 +101,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 10),
 
-                // =========================================================
-                // ROLE DROPDOWN
-                // =========================================================
-
                 DropdownButtonFormField<String>(
                   value: _selectedRole,
 
-                  // Dropdown arrow
                   icon: const Icon(
                     Icons.arrow_drop_down,
                     color: Color(0xFF7352B5),
@@ -124,8 +112,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   dropdownColor: const Color(0xFFFFF7FF),
 
                   decoration: InputDecoration(
-
-                    // Dynamic icon according to selected role
                     prefixIcon: Icon(
                       _selectedRole == 'Doctor'
                           ? Icons.medical_services_outlined
@@ -152,22 +138,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  // Create dropdown options
                   items: _roles.map((String role) {
-
                     return DropdownMenuItem<String>(
                       value: role,
 
                       child: Row(
                         children: [
-
                           Icon(
                             role == 'Doctor'
                                 ? Icons.medical_services_outlined
                                 : Icons.person_outline,
-
                             size: 20,
-
                             color: const Color(0xFF7352B5),
                           ),
 
@@ -183,21 +164,63 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                     );
-
                   }).toList(),
 
-                  // When user selects a role
                   onChanged: (String? newValue) {
-
                     if (newValue != null) {
-
                       setState(() {
                         _selectedRole = newValue;
                       });
-
                     }
-
                   },
+                ),
+
+                const SizedBox(height: 25),
+
+                // =========================================================
+                // FULL NAME
+                // =========================================================
+
+                const Text(
+                  "Full Name",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF202020),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                TextField(
+                  keyboardType: TextInputType.name,
+
+                  decoration: InputDecoration(
+                    hintText: "Enter your full name",
+
+                    prefixIcon: const Icon(
+                      Icons.person_outline,
+                    ),
+
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF7352B5),
+                        width: 2,
+                      ),
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 25),
@@ -221,11 +244,58 @@ class _LoginScreenState extends State<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
 
                   decoration: InputDecoration(
-
                     hintText: "Enter your email",
 
                     prefixIcon: const Icon(
                       Icons.email_outlined,
+                    ),
+
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF7352B5),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 25),
+
+                // =========================================================
+                // PHONE NUMBER
+                // =========================================================
+
+                const Text(
+                  "Phone Number",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF202020),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                TextField(
+                  keyboardType: TextInputType.phone,
+
+                  decoration: InputDecoration(
+                    hintText: "Enter your phone number",
+
+                    prefixIcon: const Icon(
+                      Icons.phone_outlined,
                     ),
 
                     border: OutlineInputBorder(
@@ -270,16 +340,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: _obscurePassword,
 
                   decoration: InputDecoration(
-
-                    hintText: "Enter your password",
+                    hintText: "Create a password",
 
                     prefixIcon: const Icon(
                       Icons.lock_outline,
                     ),
 
-                    // Password visibility button
                     suffixIcon: IconButton(
-
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_off_outlined
@@ -287,12 +354,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
 
                       onPressed: () {
-
                         setState(() {
                           _obscurePassword =
-                              !_obscurePassword;
+                          !_obscurePassword;
                         });
-
                       },
                     ),
 
@@ -317,34 +382,73 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 25),
 
                 // =========================================================
-                // FORGOT PASSWORD
+                // CONFIRM PASSWORD
                 // =========================================================
 
-                Align(
-                  alignment: Alignment.centerRight,
+                const Text(
+                  "Confirm Password",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF202020),
+                  ),
+                ),
 
-                  child: TextButton(
-                    onPressed: () {
-                      // Functionality will be added later
-                    },
+                const SizedBox(height: 10),
 
-                    child: const Text(
-                      "Forgot Password?",
-                      style: TextStyle(
+                TextField(
+                  obscureText: _obscureConfirmPassword,
+
+                  decoration: InputDecoration(
+                    hintText: "Confirm your password",
+
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                    ),
+
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+
+                      onPressed: () {
+                        setState(() {
+                          _obscureConfirmPassword =
+                          !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
                         color: Color(0xFF7352B5),
-                        fontSize: 15,
+                        width: 2,
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 18),
+                const SizedBox(height: 30),
 
                 // =========================================================
-                // LOGIN BUTTON
+                // CREATE ACCOUNT BUTTON
                 // =========================================================
 
                 SizedBox(
@@ -352,29 +456,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 58,
 
                   child: ElevatedButton(
-
                     onPressed: () {
-
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> PatientDashboard()));
                       print(
-                        "Login selected as: $_selectedRole",
+                        "Creating account as: $_selectedRole",
                       );
-
                     },
 
                     style: ElevatedButton.styleFrom(
-
-                      backgroundColor:
-                          const Color(0xFFF7F1FA),
-
-                      foregroundColor:
-                          const Color(0xFF7352B5),
-
+                      backgroundColor: const Color(0xFFF7F1FA),
+                      foregroundColor: const Color(0xFF7352B5),
                       elevation: 0,
 
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(30),
+                        borderRadius: BorderRadius.circular(30),
 
                         side: const BorderSide(
                           color: Color(0xFFE2D9E7),
@@ -383,7 +477,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
 
                     child: const Text(
-                      "Login",
+                      "Create Account",
 
                       style: TextStyle(
                         fontSize: 17,
@@ -396,17 +490,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 28),
 
                 // =========================================================
-                // SIGN UP
+                // LOGIN LINK
                 // =========================================================
 
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
 
                   children: [
-
                     const Text(
-                      "Don't have an account? ",
+                      "Already have an account? ",
 
                       style: TextStyle(
                         fontSize: 15,
@@ -416,11 +508,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     TextButton(
                       onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> const SignupScreen() ));
+                        // Navigation will be added later
                       },
 
                       child: const Text(
-                        "Sign Up",
+                        "Login",
 
                         style: TextStyle(
                           fontSize: 15,
