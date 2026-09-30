@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "483353229946",
+    "project_id": "aihealthcompanion-ac088",
+    "storage_bucket": "aihealthcompanion-ac088.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:483353229946:android:e6bebc5c426109c28359c3",
+        "android_client_info": {
+          "package_name": "com.example.ai_healthcompanion_using_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDg7BYN90havWITV6S5wSKaPa6HRduDYak"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

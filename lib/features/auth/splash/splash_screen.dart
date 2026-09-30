@@ -36,15 +36,15 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
 
-            const Icon(
-              Icons.health_and_safety,
-              size: 90,
-            ),
+
+              Image.asset("lib/logo/HealthCompanionLogo1.png",height: 500,width: 500),
+
+
 
             const SizedBox(height: 20),
 
             const Text(
-              "Healthcare Companion",
+              "HealthCompanion",
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
