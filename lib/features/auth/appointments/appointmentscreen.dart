@@ -11,17 +11,21 @@ class AppointmentsScreen extends StatefulWidget {
   State<AppointmentsScreen> createState() => _AppointmentsScreenState();
 }
 class _AppointmentsScreenState extends State<AppointmentsScreen> {
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _doctors;
+  late Stream<QuerySnapshot<Map<String, dynamic>>> _doctors;
   Stream<QuerySnapshot<Map<String, dynamic>>>? _appointments;
   String _query = '', _status = 'All';
   final Set<String> _busy = {};
   @override
   void initState() {
     super.initState();
+    _subscribe();
+  }
+  void _subscribe() {
     _doctors = FirebaseFirestore.instance.collection('doctors').snapshots();
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) _appointments = FirebaseFirestore.instance.collection('appointments').where('patientId', isEqualTo: uid).snapshots();
+    _appointments = uid == null ? null : FirebaseFirestore.instance.collection('appointments').where('patientId', isEqualTo: uid).snapshots();
   }
+  Widget _loadError(String message) => PatientPanel(title: 'Live data unavailable', child: Column(children: [PatientEmpty(message), OutlinedButton.icon(onPressed: () => setState(_subscribe), icon: const Icon(Icons.refresh), label: const Text('Retry'))]));
   void _message(String text) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
   Future<void> _book(Map<String, dynamic> doctor) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -76,7 +80,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       const SizedBox(height: 18),
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: _appointments, builder: (context, snapshot) {
         if (_appointments == null) return const PatientEmpty('Sign in to view your appointments.');
-        if (snapshot.hasError) return const PatientEmpty('Unable to load appointments. Check your connection and account permissions.');
+        if (snapshot.hasError) return _loadError('Unable to load appointments. Check your connection and account permissions.');
         if (!snapshot.hasData) return const LinearProgressIndicator();
         final all = snapshot.data!.docs.map((d) => {...d.data(), 'id': d.id}).toList();
         all.sort((a, b) => (patientDate(b['appointmentDate']) ?? DateTime(1900)).compareTo(patientDate(a['appointmentDate']) ?? DateTime(1900)));
@@ -96,7 +100,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       TextField(onChanged: (v) => setState(() => _query = v.trim().toLowerCase()), decoration: InputDecoration(hintText: 'Find a doctor or specialization', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
       const SizedBox(height: 18),
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: _doctors, builder: (context, snapshot) {
-        if (snapshot.hasError) return const PatientEmpty('Unable to load the doctor directory. Check your connection and account permissions.');
+        if (snapshot.hasError) return _loadError('Unable to load the doctor directory. Check your connection and account permissions.');
         if (!snapshot.hasData) return const LinearProgressIndicator();
         final doctors = snapshot.data!.docs.map((d) => {...d.data(), 'id': d.id}).where((d) => (d['status'] ?? 'active') == 'active' && '${d['name'] ?? ''} ${d['specialization'] ?? ''}'.toLowerCase().contains(_query)).toList();
         doctors.sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));

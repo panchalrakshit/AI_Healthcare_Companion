@@ -91,6 +91,22 @@ void main() {
     expect(patientDate(saved?['appointmentDate'])!.isAfter(DateTime.now()), isTrue);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('populated overview fits a narrow phone and uses saved readings', (tester) async {
+    tester.view.physicalSize = const Size(320, 1800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final now = Timestamp.now();
+    await tester.pumpWidget(MaterialApp(home: PatientWorkspace(data: PatientSnapshot(
+      user: {'name': 'Patient with a longer full name'}, profile: {'heartRate': 76, 'bloodPressure': '120/80', 'updatedAt': now},
+      records: [{'title': 'Measured health readings', 'recordType': 'Vital Signs', 'recordDate': now, 'vitals': {'heartRate': 76}}],
+      appointments: [{'doctorName': 'Dr. Test', 'status': 'confirmed', 'appointmentDate': now, 'appointmentTime': '10:00 AM'}]),
+      onReading: () {}, onProfile: () {}, onAddRecord: () {}, onEditRecord: (_) {}, onDeleteRecord: (_) {}, onLogout: () {}, onResetPassword: () {}, onRetry: () {})));
+    await tester.pumpAndSettle();
+    expect(find.text('A clearer view of your health'), findsOneWidget);
+    expect(find.text('76.0'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -1400)); await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('patient workspace renders empty and live error states on mobile', (tester) async {
     tester.view.physicalSize = const Size(320, 1800); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
