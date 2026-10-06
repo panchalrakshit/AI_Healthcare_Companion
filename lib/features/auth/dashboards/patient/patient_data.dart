@@ -96,7 +96,7 @@ class PatientStats {
   DateTime get end => DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
   bool inPeriod(DateTime d) => !d.isBefore(start) && d.isBefore(end) && !d.isAfter(now);
   List<Map<String, dynamic>> get period => data.appointments.where((a) {
-    final d = patientDate(a['appointmentDate']); return d != null && inPeriod(d);
+    final d = patientDate(a['appointmentDate']); return d != null && !d.isBefore(start) && d.isBefore(end);
   }).toList();
   List<Map<String, dynamic>> get upcoming {
     final today = DateTime(now.year, now.month, now.day);

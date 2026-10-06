@@ -118,7 +118,7 @@ class _PatientInsightsState extends State<PatientInsights> {
             decoration: BoxDecoration(color: Color.lerp(const Color(0xFFF0EBFD), patientPurple, peak == 0 ? 0 : weekdays[i] / peak), borderRadius: BorderRadius.circular(9)),
             child: Text('${weekdays[i]}', style: TextStyle(fontWeight: FontWeight.bold, color: peak > 0 && weekdays[i] / peak > .5 ? Colors.white : patientPurple)))),
           const SizedBox(height: 8), Text(names[i], style: const TextStyle(fontSize: 9)),
-        ]))))))),
+        ])))))),
       ]),
     ]);
   }

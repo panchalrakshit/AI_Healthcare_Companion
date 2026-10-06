@@ -177,14 +177,18 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
     ]),
     FilledButton.icon(onPressed: widget.onReading, icon: const Icon(Icons.add, size: 18), label: const Text('Add reading')),
   ]);
-  Widget _content() => switch (_page) {
+  Widget _content() {
+    if (widget.data.errors.isNotEmpty) return const PatientPanel(title: 'Live data unavailable', child: Text('Retry the failed sources above to view your current information.'));
+    if (widget.data.loading.isNotEmpty) return const PatientPanel(title: 'Connecting to your account', child: Text('Your saved information will appear when loading finishes.'));
+    return switch (_page) {
     1 => PatientInsights(stats: _stats, onRange: (d) => setState(() => _days = d)),
     2 => Column(children: [Align(alignment: Alignment.centerRight, child: OutlinedButton.icon(onPressed: _exporting ? null : _exportRecords, icon: const Icon(Icons.copy_outlined), label: const Text('Copy records CSV'))), const SizedBox(height: 12),
       PatientRecords(records: _stats.recentRecords, onAdd: widget.onAddRecord, onEdit: widget.onEditRecord, onDelete: widget.onDeleteRecord)]),
     4 => _reminders(),
     5 => _profile(),
     _ => _overview(),
-  };
+    };
+  }
   Widget _overview() {
     final data = widget.data;
     final stats = _stats;

@@ -46,7 +46,7 @@ void main() {
     var days = 30;
     final now = DateTime.now();
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(16), child: PatientInsights(
-      stats: PatientStats(PatientSnapshot(records: [{'vitals': {'heartRate': 76}, 'recordDate': Timestamp.fromDate(now)}]), now: now), onRange: (d) => days = d)))))));
+      stats: PatientStats(PatientSnapshot(records: [{'vitals': {'heartRate': 76}, 'recordDate': Timestamp.fromDate(now)}]), now: now), onRange: (d) => days = d))))));
     expect(find.text('76.0 bpm'), findsOneWidget);
     await tester.tap(find.text('7 days')); expect(days, 7);
     await tester.tap(find.text('Weight')); await tester.pumpAndSettle();
@@ -60,6 +60,10 @@ void main() {
     await tester.tap(find.text('Open')); await tester.pumpAndSettle();
     await tester.tap(find.text('Save reading')); await tester.pumpAndSettle();
     expect(find.text('Enter at least one measured reading.'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Heart rate (bpm)'), '-2');
+    await tester.tap(find.text('Save reading')); await tester.pumpAndSettle();
+    expect(find.text('Enter a positive number up to 10000.'), findsOneWidget);
+    expect(saved, isNull);
     await tester.enterText(find.widgetWithText(TextFormField, 'Heart rate (bpm)'), '76');
     await tester.tap(find.text('Save reading')); await tester.pumpAndSettle();
     expect(saved, {'heartRate': 76.0}); expect(tester.takeException(), isNull);
