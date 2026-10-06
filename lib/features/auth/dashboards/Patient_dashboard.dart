@@ -135,7 +135,7 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
   static const _icons = [Icons.space_dashboard_outlined, Icons.insights_outlined, Icons.folder_outlined, Icons.calendar_month_outlined, Icons.notifications_none_outlined, Icons.person_outline];
   PatientStats get _stats => PatientStats(widget.data, days: _days);
   void _select(int i) { setState(() => _page = i); }
-  Widget _nav({bool drawer = false}) => Container(color: Colors.white, width: 248, child: SafeArea(child: Column(children: [
+  Widget _nav({bool drawer = false}) => SizedBox(width: 248, child: Material(color: Colors.white, child: SafeArea(child: Column(children: [
     const Padding(padding: EdgeInsets.fromLTRB(22, 28, 22, 25), child: Row(children: [Icon(Icons.favorite_rounded, color: patientPurple, size: 30), SizedBox(width: 10), Expanded(child: Text('Health\nCompanion', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: patientInk)))])),
     const Padding(padding: EdgeInsets.only(bottom: 20), child: Text('PATIENT WORKSPACE', style: TextStyle(fontSize: 10, letterSpacing: 2, color: patientMuted))),
     Expanded(child: ListView(children: List.generate(_pages.length, (i) => Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4), child: ListTile(
@@ -144,7 +144,7 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
       onTap: () { if (drawer) Navigator.pop(context); _select(i); },
     ))))),
     Padding(padding: const EdgeInsets.all(14), child: ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: widget.onLogout)),
-  ])));
+  ]))));
   @override
   Widget build(BuildContext context) => Theme(data: Theme.of(context).copyWith(
     colorScheme: ColorScheme.fromSeed(seedColor: patientPurple), scaffoldBackgroundColor: patientBackground,

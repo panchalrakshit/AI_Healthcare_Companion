@@ -13,16 +13,16 @@ class PatientPanel extends StatelessWidget {
   final Widget? action;
   const PatientPanel({super.key, required this.title, this.subtitle = '', required this.child, this.action});
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(22),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE8E4F3))),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Color(0xFFE8E4F3))),
+    child: Padding(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
         Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: patientInk)), if (action != null) action!,
       ]),
       if (subtitle.isNotEmpty) ...[const SizedBox(height: 6), Text(subtitle, style: const TextStyle(fontSize: 12, color: patientMuted))],
       const SizedBox(height: 20), child,
-    ]),
+    ])),
   );
 }
 class PatientEmpty extends StatelessWidget {
