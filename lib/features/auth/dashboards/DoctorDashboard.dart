@@ -44,13 +44,13 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       })),
   );
 
-  Widget _sidebar({bool close = false}) => Container(color: const Color(0xFF075E5A), child: SafeArea(child: Column(children: [
+  Widget _sidebar({bool close = false}) => Material(color: const Color(0xFF075E5A), child: SafeArea(child: Column(children: [
     const Padding(padding: EdgeInsets.fromLTRB(20, 28, 16, 24), child: Row(children: [Icon(Icons.health_and_safety_outlined, color: Colors.white, size: 32), SizedBox(width: 12),
       Expanded(child: Text('HealthCompanion', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)))])),
     const Padding(padding: EdgeInsets.all(16), child: Align(alignment: Alignment.centerLeft, child: Text('DOCTOR WORKSPACE', style: TextStyle(color: Colors.white60, fontSize: 11, letterSpacing: 1.2)))),
     Expanded(child: ListView(children: List.generate(_labels.length, (i) => Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(selected: _page == i, selectedTileColor: Colors.white, selectedColor: const Color(0xFF075E5A), textColor: Colors.white70, iconColor: Colors.white70,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), leading: Icon(_icons[i]), title: Text(_labels[i]), onTap: () {
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), leading: Icon(_icons[i]), title: Text(_labels[i], style: TextStyle(fontWeight: _page == i ? FontWeight.w700 : FontWeight.w500)), onTap: () {
           setState(() { _page = i; _search = ''; _status = 'all'; }); if (close) Navigator.pop(context);
         }))))),
     Padding(padding: const EdgeInsets.all(12), child: ListTile(leading: const Icon(Icons.logout, color: Colors.white70), title: const Text('Sign out', style: TextStyle(color: Colors.white70)), onTap: _logout)),
