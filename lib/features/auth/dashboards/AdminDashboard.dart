@@ -1,4 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'admin/admin_analytics.dart';
+import 'admin/admin_account_dialog.dart';
+import '../login/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -12,6 +16,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   int _selected = 0;
   String _search = '';
+  int _days = 30;
+  String _filter = 'all';
+  final Set<String> _busy = {};
+  late final _usersStream = _db.collection('users').snapshots();
+  late final _doctorsStream = _db.collection('doctors').snapshots();
+  late final _appointmentsStream = _db.collection('appointments').snapshots();
   static const _titles = ['Overview', 'Patients', 'Doctors', 'Appointments'];
   static const _icons = [Icons.dashboard_outlined, Icons.people_outline, Icons.medical_services_outlined, Icons.calendar_month_outlined];
 
@@ -61,7 +71,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             leading: Icon(_icons[i]),
             title: Text(_titles[i], style: const TextStyle(fontWeight: FontWeight.w600)),
             onTap: () {
-              setState(() { _selected = i; _search = ''; });
+              setState(() { _selected = i; _search = ''; _filter = 'all'; });
               if (close) Navigator.pop(context);
             },
           ),
@@ -81,66 +91,105 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return _overview();
   }
 
-  Widget _shell(String title, String subtitle, Widget child, {bool search = false}) => SafeArea(
+  Widget _shell(String title, String subtitle, Widget child, {bool search = false, Widget? action}) => SafeArea(
     child: Column(children: [
       Container(
         color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(28, 20, 28, 18),
-        child: Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF242044))),
-            const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Color(0xFF777384))),
-          ])),
-          if (search) SizedBox(
-            width: 280,
-            child: TextField(
-              onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
-              decoration: InputDecoration(hintText: 'Search...', prefixIcon: const Icon(Icons.search), isDense: true, filled: true, fillColor: const Color(0xFFF7F6FB), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-            ),
-          ),
+        padding: const EdgeInsets.all(22),
+        width: double.infinity,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800, color: Color(0xFF242044))),
+            const SizedBox(height: 5), Text(subtitle, style: const TextStyle(color: Color(0xFF777384))),
+          ])), if (action != null) action]),
+          if (search) ...[
+            const SizedBox(height: 16),
+            TextField(key: ValueKey('search-$_selected'), onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
+              decoration: InputDecoration(hintText: 'Search by name, email or specialty…', prefixIcon: const Icon(Icons.search),
+                filled: true, fillColor: const Color(0xFFF7F6FB), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, children: (_selected == 3 ? ['all', 'pending', 'confirmed', 'completed', 'cancelled'] : ['all', 'active', 'suspended']).map((f) => ChoiceChip(
+              label: Text(f.toUpperCase()), selected: _filter == f, onSelected: (_) => setState(() => _filter = f))).toList()),
+          ],
         ]),
       ),
       Expanded(child: child),
     ]),
   );
 
-  Widget _overview() => _shell(
-    'Admin Dashboard',
-    'Monitor users, appointments and platform activity.',
-    SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _db.collection('users').snapshots(),
-          builder: (context, us) {
-            final users = us.data?.docs ?? [];
-            final patients = users.where((d) => (d.data()['role'] ?? '').toString().toLowerCase() == 'patient').length;
-            final doctors = users.where((d) => (d.data()['role'] ?? '').toString().toLowerCase() == 'doctor').length;
-            final inactive = users.where((d) => (d.data()['status'] ?? '').toString().toLowerCase() != 'active').length;
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _db.collection('appointments').snapshots(),
-              builder: (context, ap) {
-                final appointments = ap.data?.docs ?? [];
-                final pending = appointments.where((d) => (d.data()['status'] ?? 'pending').toString().toLowerCase() == 'pending').length;
-                return Wrap(spacing: 16, runSpacing: 16, children: [
-                  _metric('Patients', patients, Icons.people_outline),
-                  _metric('Doctors', doctors, Icons.medical_services_outlined),
-                  _metric('Appointments', appointments.length, Icons.calendar_month_outlined),
-                  _metric('Pending', pending, Icons.pending_actions_outlined),
-                  _metric('Inactive users', inactive, Icons.person_off_outlined),
-                ]);
-              },
-            );
-          },
-        ),
-        const SizedBox(height: 30),
-        const Text('Recent appointments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+  Widget _withData(Widget Function(List<QueryDocumentSnapshot<Map<String, dynamic>>>, List<QueryDocumentSnapshot<Map<String, dynamic>>>, List<QueryDocumentSnapshot<Map<String, dynamic>>>) builder) =>
+    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: _usersStream, builder: (context, users) {
+      if (users.hasError) return _error('Unable to load user profiles. Check admin permissions.');
+      if (!users.hasData) return const Center(child: CircularProgressIndicator());
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: _doctorsStream, builder: (context, doctors) {
+        if (doctors.hasError) return _error('Unable to load the doctor directory. Check admin permissions.');
+        if (!doctors.hasData) return const Center(child: CircularProgressIndicator());
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: _appointmentsStream, builder: (context, appointments) {
+          if (appointments.hasError) return _error('Unable to load appointments. Check admin permissions.');
+          if (!appointments.hasData) return const Center(child: CircularProgressIndicator());
+          return builder(users.data!.docs, doctors.data!.docs, appointments.data!.docs);
+        });
+      });
+    });
+
+  List<_AdminAccount> _accounts(List<QueryDocumentSnapshot<Map<String, dynamic>>> users,
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> doctors, String role) {
+    final profiles = {for (final u in users) u.id: u};
+    if (role == 'patient') return users.where((u) => u.data()['role'] == 'patient')
+      .map((u) => _AdminAccount(uid: u.id, data: u.data())).toList();
+    final result = <_AdminAccount>[];
+    final linked = <String>{};
+    for (final d in doctors) {
+      final x = d.data();
+      final link = x['uid']?.toString() ?? d.id;
+      final user = profiles[link];
+      final uid = user != null && user.data()['role'] == 'doctor' ? link : null;
+      if (uid != null && linked.contains(uid)) continue;
+      if (uid != null) linked.add(uid);
+      result.add(_AdminAccount(uid: uid, doctorId: d.id, data: {...x, if (uid != null) ...user!.data()}));
+    }
+    for (final u in users.where((u) => u.data()['role'] == 'doctor' && !linked.contains(u.id))) {
+      result.add(_AdminAccount(uid: u.id, data: u.data()));
+    }
+    return result;
+  }
+
+  Widget _overview() => _shell('Admin Dashboard', 'Live insights and account management.',
+    _withData((users, doctors, appointments) {
+      final patients = _accounts(users, doctors, 'patient');
+      final physicians = _accounts(users, doctors, 'doctor');
+      final pending = appointments.where((a) => (a.data()['status'] ?? 'pending') == 'pending').length;
+      final recent = [...appointments]..sort((a, b) => (adminDate(b.data()['createdAt']) ?? adminDate(b.data()['appointmentDate']) ?? DateTime(1970))
+        .compareTo(adminDate(a.data()['createdAt']) ?? adminDate(a.data()['appointmentDate']) ?? DateTime(1970)));
+      return SingleChildScrollView(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: double.infinity, padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF4B258D), Color(0xFF8060DB)]), borderRadius: BorderRadius.circular(20)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Your platform at a glance', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8), Text('$pending pending appointments need attention.', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 16), Wrap(spacing: 10, runSpacing: 10, children: [
+              FilledButton.icon(onPressed: () => _editAccount('doctor'), icon: const Icon(Icons.person_add_alt_1), label: const Text('Add doctor')),
+              FilledButton.icon(onPressed: () => _editAccount('patient'), icon: const Icon(Icons.person_add_alt_1), label: const Text('Add patient')),
+            ]),
+          ])),
+        const SizedBox(height: 20),
+        Wrap(spacing: 14, runSpacing: 14, children: [
+          _metric('Patients', patients.length, Icons.people_outline),
+          _metric('Doctors', physicians.length, Icons.medical_services_outlined),
+          _metric('Appointments', appointments.length, Icons.calendar_month_outlined),
+          _metric('Pending', pending, Icons.pending_actions_outlined),
+          _metric('Suspended', [...patients, ...physicians].where((u) => u.data['status'] == 'suspended').length, Icons.person_off_outlined),
+        ]),
+        const SizedBox(height: 28),
+        AdminAnalytics(appointments: appointments.map((a) => a.data()).toList(), users: users.map((u) => u.data()).toList(),
+          days: _days, onDaysChanged: (d) => setState(() => _days = d)),
+        const SizedBox(height: 28),
+        const Text('Recent appointments', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
         const SizedBox(height: 14),
-        _recent(),
-      ]),
-    ),
-  );
+        if (recent.isEmpty) _empty('No appointments yet.')
+        else Container(decoration: _card(), child: Column(children: recent.take(8).map((d) => _appointmentTile(d, compact: true)).toList())),
+      ]));
+    }));
 
   Widget _metric(String label, int value, IconData icon) => Container(
     width: 205,
@@ -156,88 +205,91 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ]),
   );
 
-  Widget _recent() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-    stream: _db.collection('appointments').limit(8).snapshots(),
-    builder: (context, s) {
-      if (s.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-      if (s.hasError) return _error('Unable to load appointments.');
-      final docs = s.data?.docs ?? [];
-      if (docs.isEmpty) return _empty('No appointments found.');
-      return Container(decoration: _card(), child: Column(children: docs.map((d) => _appointmentTile(d, compact: true)).toList()));
-    },
-  );
+  Widget _users(String role) => _shell(role == 'doctor' ? 'Doctors' : 'Patients',
+    'Add, edit, activate, suspend or remove accounts.',
+    _withData((users, doctors, appointments) {
+      final accounts = _accounts(users, doctors, role).where((a) {
+        final x = a.data;
+        return (_filter == 'all' || (x['status'] ?? 'active') == _filter) &&
+          (_search.isEmpty || ['name', 'fullName', 'email', 'phone', 'specialization'].any((k) => (x[k] ?? '').toString().toLowerCase().contains(_search)));
+      }).toList()..sort((a, b) => (a.data['name'] ?? '').toString().compareTo((b.data['name'] ?? '').toString()));
+      if (accounts.isEmpty) return _empty('No matching $role accounts. Use Add to create one.');
+      return ListView.separated(padding: const EdgeInsets.all(22), itemCount: accounts.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12), itemBuilder: (_, i) => _userCard(accounts[i], role));
+    }), search: true,
+    action: FilledButton.icon(onPressed: () => _editAccount(role), icon: const Icon(Icons.add), label: const Text('Add')));
 
-  Widget _users(String role) {
-    final plural = role == 'doctor' ? 'Doctors' : 'Patients';
-    return _shell(
-      plural,
-      'View and manage registered ' + role + ' accounts.',
-      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _db.collection('users').where('role', isEqualTo: role).snapshots(),
-        builder: (context, s) {
-          if (s.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (s.hasError) return _error('Unable to load ' + plural + '.');
-          var docs = s.data?.docs ?? [];
-          if (_search.isNotEmpty) {
-            docs = docs.where((d) {
-              final x = d.data();
-              return ['name', 'fullName', 'email', 'phone', 'specialization'].map((k) => (x[k] ?? '').toString().toLowerCase()).any((v) => v.contains(_search));
-            }).toList();
-          }
-          if (docs.isEmpty) return _empty('No ' + plural + ' found.');
-          return ListView.separated(
-            padding: const EdgeInsets.all(28),
-            itemCount: docs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, i) => _userCard(docs[i], role),
-          );
-        },
-      ),
-      search: true,
-    );
+  Widget _userCard(_AdminAccount account, String role) {
+    final x = account.data;
+    final name = (x['name'] ?? x['fullName'] ?? 'Unnamed user').toString();
+    final status = (x['status'] ?? 'active').toString();
+    return Container(padding: const EdgeInsets.all(18), decoration: _card(), child: Row(children: [
+      CircleAvatar(backgroundColor: const Color(0xFFEFE7FF), child: Icon(role == 'doctor' ? Icons.medical_services : Icons.person, color: const Color(0xFF6335D6))),
+      const SizedBox(width: 14),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        const SizedBox(height: 4), Text((x['email'] ?? 'No email').toString()),
+        if (role == 'doctor') Text((x['specialization'] ?? 'No specialty').toString(), style: const TextStyle(color: Color(0xFF7352D6))),
+        if (account.uid == null) const Text('Directory entry • no linked login', style: TextStyle(fontSize: 11, color: Colors.grey)),
+      ])),
+      _status(status),
+      if (_busy.contains(account.key)) const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+      else PopupMenuButton<String>(onSelected: (v) {
+        if (v == 'edit') _editAccount(role, account: account);
+        if (v == 'active' || v == 'suspended') _accountAction(account, 'adminSetAccountStatus', {'status': v});
+        if (v == 'delete') _confirmDeleteAccount(account);
+      }, itemBuilder: (_) => const [
+        PopupMenuItem(value: 'edit', child: Text('Edit details')),
+        PopupMenuItem(value: 'active', child: Text('Activate account')),
+        PopupMenuItem(value: 'suspended', child: Text('Suspend account')),
+        PopupMenuDivider(), PopupMenuItem(value: 'delete', child: Text('Remove account')),
+      ]),
+    ]));
   }
 
-  Widget _userCard(QueryDocumentSnapshot<Map<String, dynamic>> doc, String role) {
-    final x = doc.data();
-    final name = (x['name'] ?? x['fullName'] ?? 'Unnamed user').toString();
-    final email = (x['email'] ?? 'No email').toString();
-    final status = (x['status'] ?? 'active').toString().toLowerCase();
-    final specialty = (x['specialization'] ?? '').toString();
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: _card(),
-      child: Row(children: [
-        CircleAvatar(radius: 25, backgroundColor: const Color(0xFFEFE7FF), child: Icon(role == 'doctor' ? Icons.medical_services : Icons.person, color: const Color(0xFF6335D6))),
-        const SizedBox(width: 15),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(email, style: const TextStyle(color: Color(0xFF777384), fontSize: 13)),
-          if (specialty.isNotEmpty) Text(specialty, style: const TextStyle(color: Color(0xFF6335D6), fontSize: 12)),
-        ])),
-        _status(status),
-        const SizedBox(width: 8),
-        PopupMenuButton<String>(
-          onSelected: (v) {
-            if (v == 'active' || v == 'suspended') _setUserStatus(doc.id, v);
-            if (v == 'delete') _confirmDelete(doc);
-          },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'active', child: Text('Activate account')),
-            PopupMenuItem(value: 'suspended', child: Text('Suspend account')),
-            PopupMenuDivider(),
-            PopupMenuItem(value: 'delete', child: Text('Delete Firestore profile')),
-          ],
-        ),
-      ]),
-    );
+  Future<void> _call(String name, Map<String, dynamic> data) async {
+    try { await FirebaseFunctions.instanceFor(region: 'us-central1').httpsCallable(name).call(data); }
+    on FirebaseFunctionsException catch (e) {
+      if (['not-found', 'unavailable', 'unimplemented'].contains(e.code)) {
+        throw Exception('Account service is unavailable. Ask the project owner to deploy the admin functions.');
+      }
+      throw Exception(e.message ?? 'Account operation failed (${e.code}).');
+    }
+  }
+
+  Future<void> _editAccount(String role, {_AdminAccount? account}) async {
+    final saved = await showDialog<bool>(context: context, barrierDismissible: false, builder: (_) => AdminAccountDialog(
+      role: role, initial: account?.data, onSave: (fields) => _call(account == null ? 'adminCreateAccount' : 'adminUpdateAccount',
+        {...fields, if (account == null) 'role': role, if (account != null) ...account.target}),
+    ));
+    if (saved == true) _message(account == null ? 'Account created successfully.' : 'Account updated.');
+  }
+
+  Future<void> _accountAction(_AdminAccount account, String function, Map<String, dynamic> fields) async {
+    if (_busy.contains(account.key)) return;
+    setState(() => _busy.add(account.key));
+    try { await _call(function, {...account.target, ...fields}); _message('Account updated.'); }
+    catch (e) { _message(e.toString().replaceFirst('Exception: ', '')); }
+    finally { if (mounted) setState(() => _busy.remove(account.key)); }
+  }
+
+  Future<void> _confirmDeleteAccount(_AdminAccount account) async {
+    final name = (account.data['name'] ?? account.data['email'] ?? 'this account').toString();
+    final yes = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Remove account?'),
+      content: Text(account.uid == null ? 'Remove $name from the doctor directory?'
+        : 'Remove $name and their login account? Appointment and health history will be retained. This cannot be undone.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove'))],
+    ));
+    if (yes == true) await _accountAction(account, 'adminDeleteAccount', {});
   }
 
   Widget _appointments() => _shell(
     'Appointments',
     'Review and update appointment status.',
     StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db.collection('appointments').snapshots(),
+      stream: _appointmentsStream,
       builder: (context, s) {
         if (s.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         if (s.hasError) return _error('Unable to load appointments.');
@@ -248,6 +300,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           if (ad is Timestamp && bd is Timestamp) return bd.compareTo(ad);
           return 0;
         });
+        docs = docs.where((d) => _filter == 'all' || (d.data()['status'] ?? 'pending') == _filter).toList();
         if (_search.isNotEmpty) {
           docs = docs.where((d) {
             final x = d.data();
@@ -293,12 +346,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
         if (!compact) ...[
           const SizedBox(width: 8),
           PopupMenuButton<String>(
-            onSelected: (v) => _setAppointmentStatus(doc.id, v),
+            onSelected: (v) {
+              if (v == 'delete') { _deleteAppointment(doc); }
+              else { _setAppointmentStatus(doc.id, v); }
+            },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'pending', child: Text('Mark pending')),
               PopupMenuItem(value: 'confirmed', child: Text('Confirm')),
               PopupMenuItem(value: 'completed', child: Text('Mark completed')),
               PopupMenuItem(value: 'cancelled', child: Text('Cancel')),
+              PopupMenuDivider(),
+              PopupMenuItem(value: 'delete', child: Text('Delete appointment')),
             ],
           ),
         ],
@@ -322,13 +380,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Future<void> _setUserStatus(String uid, String status) async {
-    try {
-      await _db.collection('users').doc(uid).update({'status': status, 'updatedAt': FieldValue.serverTimestamp()});
-      _message('Account marked ' + status + '.');
-    } catch (e) { _message('Could not update account: ' + e.toString()); }
-  }
-
   Future<void> _setAppointmentStatus(String id, String status) async {
     try {
       await _db.collection('appointments').doc(id).update({'status': status, 'updatedAt': FieldValue.serverTimestamp()});
@@ -336,30 +387,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
     } catch (e) { _message('Could not update appointment: ' + e.toString()); }
   }
 
-  Future<void> _confirmDelete(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
-    final x = doc.data();
-    final name = (x['name'] ?? x['fullName'] ?? x['email'] ?? 'this user').toString();
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete profile?'),
-        content: Text('Delete the Firestore profile for ' + name + '? This does not delete the Firebase Authentication account.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
-        ],
-      ),
-    );
+  Future<void> _deleteAppointment(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
+    final yes = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Delete appointment?'), content: const Text('This permanently removes the appointment record.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete'))]));
     if (yes == true) {
-      try { await doc.reference.delete(); _message('Profile deleted.'); }
-      catch (e) { _message('Could not delete profile: ' + e.toString()); }
+      try { await doc.reference.delete(); _message('Appointment deleted.'); }
+      catch (e) { _message('Could not delete appointment: $e'); }
     }
   }
 
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
-    Navigator.of(context).popUntil((r) => r.isFirst);
+    Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
   }
 
   void _message(String text) {
@@ -376,4 +418,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
     border: Border.all(color: const Color(0xFFE8E4EF)),
     boxShadow: [BoxShadow(color: Colors.black.withOpacity(.025), blurRadius: 12, offset: const Offset(0, 5))],
   );
+}
+
+
+class _AdminAccount {
+  final String? uid;
+  final String? doctorId;
+  final Map<String, dynamic> data;
+  _AdminAccount({this.uid, this.doctorId, required this.data});
+  String get key => doctorId ?? uid!;
+  Map<String, dynamic> get target => {if (uid != null) 'uid': uid, if (doctorId != null) 'doctorId': doctorId};
 }
