@@ -40,7 +40,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }),
   );
 
-  Widget _sidebar({bool close = false}) => Container(
+  Widget _sidebar({bool close = false}) => Material(
     color: Colors.white,
     child: SafeArea(child: Column(children: [
       const Padding(
