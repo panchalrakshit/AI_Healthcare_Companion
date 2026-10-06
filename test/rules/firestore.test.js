@@ -164,3 +164,21 @@ test('doctor cannot complete pending visits or reopen completed visits', async (
   await assertSucceeds(updateDoc(doc(db, 'appointments', 'one'), { status: 'completed' }));
   await assertFails(updateDoc(doc(db, 'appointments', 'one'), { status: 'pending' }));
 });
+
+test('patient measured-reading transaction saves only own history and profile', async () => {
+  const db = user('patient');
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'healthProfiles', 'patient'), { uid: 'patient', heartRate: 76 });
+  batch.set(doc(db, 'healthRecords', 'reading'), { patientId: 'patient', recordType: 'Vital Signs', vitals: { heartRate: 76 }, measuredAt: Timestamp.now(), recordDate: Timestamp.now() });
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(getDocs(query(collection(db, 'healthRecords'), where('patientId', '==', 'patient'))));
+  await assertFails(getDocs(collection(db, 'healthRecords')));
+  await assertFails(getDoc(doc(user('other'), 'healthRecords', 'reading')));
+  await assertFails(updateDoc(doc(db, 'healthRecords', 'reading'), { patientId: 'other' }));
+  await assertSucceeds(updateDoc(doc(db, 'healthRecords', 'reading'), { title: 'My measurement' }));
+  await assertSucceeds(deleteDoc(doc(db, 'healthRecords', 'reading')));
+  const forged = writeBatch(db);
+  forged.set(doc(db, 'healthProfiles', 'patient'), { uid: 'patient', heartRate: 90 });
+  forged.set(doc(db, 'healthRecords', 'forged'), { patientId: 'other', vitals: { heartRate: 90 } });
+  await assertFails(forged.commit());
+});

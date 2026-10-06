@@ -11,8 +11,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin lib/features/auth/dashboards/DoctorDashboard.dart lib/features/auth/dashboards/doctor lib/features/auth/appointments/appointmentscreen.dart lib/features/auth/login/login_screen.dart test/admin_analytics_test.dart test/admin_account_dialog_test.dart test/doctor_dashboard_test.dart
-      - run: flutter test test/admin_analytics_test.dart test/admin_account_dialog_test.dart test/doctor_dashboard_test.dart
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin lib/features/auth/dashboards/DoctorDashboard.dart lib/features/auth/dashboards/doctor lib/features/auth/dashboards/Patient_dashboard.dart lib/features/auth/dashboards/patient lib/features/auth/appointments/appointmentscreen.dart lib/features/auth/login/login_screen.dart test/admin_analytics_test.dart test/admin_account_dialog_test.dart test/doctor_dashboard_test.dart test/patient_dashboard_test.dart
+      - run: flutter test test/admin_analytics_test.dart test/admin_account_dialog_test.dart test/doctor_dashboard_test.dart test/patient_dashboard_test.dart
   rules:
     runs-on: ubuntu-latest
     steps:
