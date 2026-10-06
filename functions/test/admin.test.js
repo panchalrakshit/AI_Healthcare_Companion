@@ -109,7 +109,7 @@ test('failed deletion batch can be retried after Auth removal', async () => {
   assert.equal(h.docs.has('users/patient'), false);
 });
 test('directory-only removal does not delete an unrelated login', async () => {
-  const h = harness(); h.seed('patient', 'patient'); h.docs.set('doctors/legacy', { name: 'Legacy Doctor' });
+  const h = harness(); h.seed('patient', 'patient'); h.docs.set('doctors/legacy', { name: 'Legacy Doctor', uid: 'old-missing-profile' });
   const result = await h.call('adminDeleteAccount', { doctorId: 'legacy' });
   assert.equal(result.loginRemoved, false); assert.equal(h.accounts.has('patient'), true);
 });

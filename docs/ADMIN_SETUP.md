@@ -63,8 +63,8 @@ cannot change their own role/status or access another patient's health data.
 
 ```powershell
 node --test functions/test/*.test.js
-flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin test/admin_analytics_test.dart
-flutter test test/admin_analytics_test.dart
+flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin test/admin_analytics_test.dart test/admin_account_dialog_test.dart
+flutter test test/admin_analytics_test.dart test/admin_account_dialog_test.dart
 
 # Rules tests use a demo project, never the live database. Requires Java 21.
 npm --prefix test/rules install

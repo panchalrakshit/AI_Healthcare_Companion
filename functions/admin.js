@@ -59,11 +59,14 @@ function createAdminHandlers({ db, auth, HttpsError, timestamp }) {
     let profile;
     if (uid) {
       profile = await db.collection('users').doc(uid).get();
-      if (!profile.exists) fail('not-found', 'User profile does not exist.');
-      if (!['patient', 'doctor'].includes(profile.data().role)) {
+      if (!profile.exists) {
+        if (doctor && !data.uid) { uid = null; profile = undefined; }
+        else fail('not-found', 'User profile does not exist.');
+      }
+      if (profile && !['patient', 'doctor'].includes(profile.data().role)) {
         fail('failed-precondition', 'Only patient and doctor accounts can be managed here.');
       }
-      if (doctor && profile.data().role !== 'doctor') fail('invalid-argument', 'This account is not a doctor.');
+      if (doctor && profile && profile.data().role !== 'doctor') fail('invalid-argument', 'This account is not a doctor.');
     }
     const directories = new Map();
     if (doctor) directories.set(doctor.id, doctor.ref);

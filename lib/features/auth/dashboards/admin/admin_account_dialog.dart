@@ -19,8 +19,8 @@ class _AdminAccountDialogState extends State<AdminAccountDialog> {
   void initState() {
     super.initState();
     for (final key in ['name', 'email', 'phone', 'password', 'specialization', 'qualification', 'experience', 'hospital', 'availability']) {
-      final initial = widget.initial;
-      final value = initial?[key] ?? (key == 'name' ? initial?['fullName'] : key == 'hospital' ? initial?['hospitalName'] : null);
+      final initial = widget.initial ?? <String, dynamic>{};
+      final value = initial[key] ?? (key == 'name' ? initial['fullName'] : key == 'hospital' ? initial['hospitalName'] : null);
       _controllers[key] = TextEditingController(text: value?.toString() ?? (key == 'availability' ? 'Available' : ''));
     }
   }

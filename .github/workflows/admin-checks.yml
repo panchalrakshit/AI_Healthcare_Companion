@@ -1,8 +1,6 @@
 name: Admin checks
 on:
   pull_request:
-  push:
-    branches: [feature/complete-admin-side]
 jobs:
   functions:
     runs-on: ubuntu-latest
@@ -21,8 +19,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin test/admin_analytics_test.dart
-      - run: flutter test test/admin_analytics_test.dart
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin test/admin_analytics_test.dart test/admin_account_dialog_test.dart
+      - run: flutter test test/admin_analytics_test.dart test/admin_account_dialog_test.dart
   rules:
     runs-on: ubuntu-latest
     steps:
