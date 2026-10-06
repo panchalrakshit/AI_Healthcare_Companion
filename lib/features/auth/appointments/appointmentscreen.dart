@@ -873,12 +873,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       .toLowerCase() ??
                       "";
 
-              return name.contains(
-                _searchQuery,
-              ) ||
-                  specialization.contains(
-                    _searchQuery,
-                  );
+              return (data['status'] ?? 'active').toString().toLowerCase() == 'active'
+                  && (name.contains(_searchQuery) || specialization.contains(_searchQuery));
             }).toList();
 
             if (filteredDoctors.isEmpty) {

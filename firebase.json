@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"aihealthcompanion-ac088","appId":"1:483353229946:android:e6bebc5c426109c28359c3","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"aihealthcompanion-ac088","configurations":{"android":"1:483353229946:android:e6bebc5c426109c28359c3","ios":"1:483353229946:ios:9f06109324d1741f8359c3","macos":"1:483353229946:ios:9f06109324d1741f8359c3","web":"1:483353229946:web:161d2e48e54f4f258359c3","windows":"1:483353229946:web:989120307c4dfbbd8359c3"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "aihealthcompanion-ac088",
+          "appId": "1:483353229946:android:e6bebc5c426109c28359c3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "aihealthcompanion-ac088",
+          "configurations": {
+            "android": "1:483353229946:android:e6bebc5c426109c28359c3",
+            "ios": "1:483353229946:ios:9f06109324d1741f8359c3",
+            "macos": "1:483353229946:ios:9f06109324d1741f8359c3",
+            "web": "1:483353229946:web:161d2e48e54f4f258359c3",
+            "windows": "1:483353229946:web:989120307c4dfbbd8359c3"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

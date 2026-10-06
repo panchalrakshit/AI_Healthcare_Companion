@@ -1,3 +1,4 @@
+import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/AdminDashboard.dart';
 import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/DoctorDashboard.dart';
 import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/Patient_dashboard.dart';
 import 'package:ai_healthcompanion_using_flutter/features/auth/login/signup.dart';
@@ -36,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final List<String> _roles = [
     'Patient',
     'Doctor',
+    'Admin',
   ];
 
   // =========================================================
@@ -62,6 +64,25 @@ class _LoginScreenState extends State<LoginScreen> {
   // =========================================================
   // LOGIN FUNCTION
   // =========================================================
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      _showMessage('Enter your email above, then select Forgot Password.');
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      if (mounted) _showMessage('If an account exists for this email, a password reset link has been sent.');
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _showMessage(e.code == 'too-many-requests'
+        ? 'Too many requests. Please try again later.'
+        : 'Could not send the reset link. Check the email and try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _loginUser() async {
     FocusScope.of(context).unfocus();
@@ -308,6 +329,16 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(
             builder: (context) =>
             const DoctorDashboard(),
+          ),
+        );
+      }
+
+      else if (role == "admin") {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+            const AdminDashboard(),
           ),
         );
       }
@@ -607,12 +638,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration:
                   InputDecoration(
                     prefixIcon: Icon(
-                      _selectedRole ==
-                          'Doctor'
-                          ? Icons
-                          .medical_services_outlined
-                          : Icons
-                          .person_outline,
+                      _selectedRole == 'Doctor'
+                          ? Icons.medical_services_outlined
+                          : _selectedRole == 'Admin'
+                          ? Icons.admin_panel_settings_outlined
+                          : Icons.person_outline,
                     ),
 
                     border:
@@ -664,12 +694,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
 
                             Icon(
-                              role ==
-                                  'Doctor'
-                                  ? Icons
-                                  .medical_services_outlined
-                                  : Icons
-                                  .person_outline,
+                              role == 'Doctor'
+                                  ? Icons.medical_services_outlined
+                                  : role == 'Admin'
+                                  ? Icons.admin_panel_settings_outlined
+                                  : Icons.person_outline,
 
                               size: 20,
 
@@ -918,10 +947,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed:
                     _isLoading
                         ? null
-                        : () {
-                      // Password reset
-                      // will be added later.
-                    },
+                        : _resetPassword,
 
                     child: const Text(
                       "Forgot Password?",

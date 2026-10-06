@@ -1,0 +1,28 @@
+name: Admin checks
+on:
+  pull_request:
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin lib/features/auth/login/login_screen.dart test/admin_analytics_test.dart test/admin_account_dialog_test.dart
+      - run: flutter test test/admin_analytics_test.dart test/admin_account_dialog_test.dart
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm --prefix test/rules install
+      - run: ./test/rules/node_modules/.bin/firebase emulators:exec --only firestore --project demo-health-admin "node --test test/rules/firestore.test.js"
