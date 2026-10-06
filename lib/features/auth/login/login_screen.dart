@@ -1,3 +1,4 @@
+import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/AdminDashboard.dart';
 import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/DoctorDashboard.dart';
 import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/Patient_dashboard.dart';
 import 'package:ai_healthcompanion_using_flutter/features/auth/login/signup.dart';
@@ -36,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final List<String> _roles = [
     'Patient',
     'Doctor',
+    'Admin',
   ];
 
   // =========================================================
@@ -308,6 +310,16 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(
             builder: (context) =>
             const DoctorDashboard(),
+          ),
+        );
+      }
+
+      else if (role == "admin") {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+            const AdminDashboard(),
           ),
         );
       }
@@ -607,12 +619,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration:
                   InputDecoration(
                     prefixIcon: Icon(
-                      _selectedRole ==
-                          'Doctor'
-                          ? Icons
-                          .medical_services_outlined
-                          : Icons
-                          .person_outline,
+                      _selectedRole == 'Doctor'
+                          ? Icons.medical_services_outlined
+                          : _selectedRole == 'Admin'
+                          ? Icons.admin_panel_settings_outlined
+                          : Icons.person_outline,
                     ),
 
                     border:
@@ -664,12 +675,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
 
                             Icon(
-                              role ==
-                                  'Doctor'
-                                  ? Icons
-                                  .medical_services_outlined
-                                  : Icons
-                                  .person_outline,
+                              role == 'Doctor'
+                                  ? Icons.medical_services_outlined
+                                  : role == 'Admin'
+                                  ? Icons.admin_panel_settings_outlined
+                                  : Icons.person_outline,
 
                               size: 20,
 
