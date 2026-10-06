@@ -21,9 +21,35 @@ service cloud.firestore {
         && (data.doctorId == request.auth.uid
           || get(/databases/$(database)/documents/doctors/$(data.doctorId)).data.get('uid', '') == request.auth.uid);
     }
+    function doctor() {
+      return active() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    }
+    function clinicalAppointment(data) {
+      let appointment = get(/databases/$(database)/documents/appointments/$(data.appointmentId)).data;
+      return doctor() && data.doctorUid == request.auth.uid
+        && appointment.patientId == data.patientId
+        && appointment.status in ['confirmed', 'completed']
+        && assignedDoctor(appointment);
+    }
+    function carePatient(patientId) {
+      let link = get(/databases/$(database)/documents/doctorPatientAccess/$(request.auth.uid + '_' + patientId)).data;
+      return doctor() && link.patientId == patientId && clinicalAppointment(link)
+        && get(/databases/$(database)/documents/users/$(patientId)).data.role == 'patient'
+        && get(/databases/$(database)/documents/users/$(patientId)).data.status == 'active';
+    }
+    function validAssessment(data) {
+      return data.keys().hasOnly(['doctorUid', 'patientId', 'appointmentId', 'patientName', 'symptoms', 'notes', 'plan', 'priority', 'followUpAt', 'createdAt', 'updatedAt'])
+        && data.patientName is string && data.patientName.size() <= 200
+        && data.symptoms is string && data.symptoms.size() <= 4000
+        && data.notes is string && data.notes.size() > 0 && data.notes.size() <= 4000
+        && data.plan is string && data.plan.size() <= 4000
+        && data.priority in ['low', 'medium', 'high']
+        && (data.followUpAt == null || data.followUpAt is timestamp)
+        && data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
     match /users/{userId} {
       // Self-read remains available to explain suspended/missing-profile login errors.
-      allow read: if signedIn() && (request.auth.uid == userId || admin());
+      allow read: if signedIn() && (request.auth.uid == userId || admin() || carePatient(userId));
       allow create: if admin() || (signedIn() && request.auth.uid == userId
         && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'role', 'status', 'createdAt'])
         && !exists(/databases/$(database)/documents/adminDeletedUsers/$(userId))
@@ -33,19 +59,25 @@ service cloud.firestore {
         && request.resource.data.status == 'active');
       // Role, status and identity are privileged fields. Clients cannot promote themselves.
       allow update: if admin() || (active() && request.auth.uid == userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'updatedAt']));
+        && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'updatedAt'])
+          || (doctor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'specialization', 'qualification', 'experience', 'hospital', 'availability', 'updatedAt']))));
       allow delete: if admin();
     }
     match /doctors/{doctorId} {
       allow read: if active();
-      allow write: if admin();
+      allow create, delete: if admin();
+      allow update: if admin() || (doctor()
+        && (resource.data.get('uid', doctorId) == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'specialization', 'qualification', 'experience', 'hospital', 'availability', 'updatedAt']));
     }
     match /healthProfiles/{userId} {
-      allow read, write: if admin() || (active() && request.auth.uid == userId);
+      allow read: if admin() || (active() && request.auth.uid == userId) || carePatient(userId);
+      allow write: if admin() || (active() && request.auth.uid == userId);
     }
     match /healthRecords/{recordId} {
       allow create: if admin() || (patient() && request.resource.data.patientId == request.auth.uid);
-      allow read, delete: if admin() || (active() && resource.data.patientId == request.auth.uid);
+      allow read: if admin() || (active() && resource.data.patientId == request.auth.uid) || carePatient(resource.data.patientId);
+      allow delete: if admin() || (active() && resource.data.patientId == request.auth.uid);
       allow update: if admin() || (active() && resource.data.patientId == request.auth.uid
         && request.resource.data.patientId == request.auth.uid);
     }
@@ -58,9 +90,35 @@ service cloud.firestore {
       allow update: if admin() || (
         active()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && ((resource.data.patientId == request.auth.uid && request.resource.data.status == 'cancelled')
-          || (assignedDoctor(resource.data) && request.resource.data.status in ['pending', 'confirmed', 'completed', 'cancelled'])));
+        && ((resource.data.patientId == request.auth.uid && resource.data.status in ['pending', 'confirmed'] && request.resource.data.status == 'cancelled')
+          || (assignedDoctor(resource.data)
+            && ((resource.data.status == 'pending' && request.resource.data.status in ['confirmed', 'cancelled'])
+              || (resource.data.status == 'confirmed' && request.resource.data.status in ['completed', 'cancelled'])))));
       allow delete: if admin() || (active() && resource.data.patientId == request.auth.uid);
+    }
+    match /doctorPatientAccess/{linkId} {
+      allow get: if admin() || (doctor() && resource.data.doctorUid == request.auth.uid);
+      allow create, update: if admin() || (doctor()
+        && request.resource.data.keys().hasOnly(['doctorUid', 'patientId', 'appointmentId', 'updatedAt'])
+        && linkId == request.auth.uid + '_' + request.resource.data.patientId
+        && clinicalAppointment(request.resource.data));
+      allow delete: if admin();
+    }
+    match /doctorAssessments/{assessmentId} {
+      allow get: if admin() || (doctor() && (!exists(/databases/$(database)/documents/doctorAssessments/$(assessmentId))
+        || resource.data.doctorUid == request.auth.uid));
+      allow list: if admin() || (doctor() && resource.data.doctorUid == request.auth.uid);
+      allow create: if admin() || (doctor() && validAssessment(request.resource.data)
+        && assessmentId == request.auth.uid + '_' + request.resource.data.appointmentId
+        && clinicalAppointment(request.resource.data) && carePatient(request.resource.data.patientId));
+      allow update: if admin() || (doctor() && resource.data.doctorUid == request.auth.uid
+        && request.resource.data.doctorUid == resource.data.doctorUid
+        && request.resource.data.patientId == resource.data.patientId
+        && request.resource.data.appointmentId == resource.data.appointmentId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validAssessment(request.resource.data) && clinicalAppointment(request.resource.data)
+        && carePatient(resource.data.patientId));
+      allow delete: if admin();
     }
     match /adminDeletedUsers/{userId} {
       allow read, create, update: if admin();

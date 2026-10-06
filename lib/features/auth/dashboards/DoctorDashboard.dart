@@ -1,1385 +1,195 @@
-import 'dart:math' as math;
-import 'package:ai_healthcompanion_using_flutter/features/auth/login/login_screen.dart' show LoginScreen;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../login/login_screen.dart';
+import 'doctor/doctor_data.dart';
+import 'doctor/doctor_insights.dart';
+import 'doctor/doctor_patient.dart';
+import 'doctor/doctor_profile.dart';
 
 class DoctorDashboard extends StatefulWidget {
   const DoctorDashboard({super.key});
-
   @override
   State<DoctorDashboard> createState() => _DoctorDashboardState();
 }
 
 class _DoctorDashboardState extends State<DoctorDashboard> {
-  int selectedMenu = 0;
-
-  final List<String> menuItems = [
-    "Dashboard",
-    "My Patients",
-    "Patient Assessment",
-    "Predictions",
-    "Appointments",
-    "Notifications",
-    "Reports",
-    "Profile",
-    "Logout",
-  ];
-
-  final List<IconData> menuIcons = [
-    Icons.dashboard_outlined,
-    Icons.people_outline,
-    Icons.assignment_outlined,
-    Icons.analytics_outlined,
-    Icons.calendar_month_outlined,
-    Icons.notifications_none_outlined,
-    Icons.description_outlined,
-    Icons.person_outline,
-    Icons.logout,
-  ];
+  final _db = FirebaseFirestore.instance;
+  late final String? _uid = FirebaseAuth.instance.currentUser?.uid;
+  late final DoctorRepository? _repository = _uid == null ? null : DoctorRepository(_db, _uid!);
+  late final _appointments = _repository?.watchAppointments();
+  late final _profile = _uid == null ? null : _db.collection('users').doc(_uid).snapshots();
+  late final _assessments = _uid == null ? null : _db.collection('doctorAssessments').where('doctorUid', isEqualTo: _uid).snapshots();
+  final _busy = <String>{};
+  int _page = 0, _days = 30;
+  String _search = '', _status = 'all';
+  static const _labels = ['Overview', 'My patients', 'Appointments', 'Assessments', 'Alerts', 'Reports', 'Profile'];
+  static const _icons = [Icons.space_dashboard_outlined, Icons.people_outline, Icons.calendar_month_outlined,
+    Icons.assignment_outlined, Icons.notifications_none_outlined, Icons.description_outlined, Icons.person_outline];
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FBFB),
-      body: SafeArea(
-        child: Row(
-          children: [
-            _buildSidebar(),
-            Expanded(
-              child: _buildMainContent(),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget build(BuildContext context) => Theme(
+    data: Theme.of(context).copyWith(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF087B75))),
+    child: Scaffold(backgroundColor: const Color(0xFFF3F8F7), body: _uid == null ? _messagePanel('Sign in to view your doctor workspace.') :
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(stream: _profile, builder: (context, profile) {
+        if (profile.hasError) return _messagePanel('Unable to verify your doctor profile. Check the connection and Firestore rules.');
+        if (!profile.hasData) return const Center(child: CircularProgressIndicator());
+        final data = profile.data!.data();
+        if (data == null || data['role'] != 'doctor' || data['status'] != 'active') return _messagePanel('Doctor access is unavailable. Your account may have been suspended or removed.');
+        return LayoutBuilder(builder: (context, c) => c.maxWidth < 900
+          ? Scaffold(backgroundColor: const Color(0xFFF3F8F7), appBar: AppBar(title: Text(_labels[_page]), backgroundColor: Colors.white),
+              drawer: Drawer(child: _sidebar(close: true)), body: _body(data))
+          : Row(children: [SizedBox(width: 235, child: _sidebar()), Expanded(child: _body(data))]));
+      })),
+  );
+
+  Widget _sidebar({bool close = false}) => Container(color: const Color(0xFF075E5A), child: SafeArea(child: Column(children: [
+    const Padding(padding: EdgeInsets.fromLTRB(20, 28, 16, 24), child: Row(children: [Icon(Icons.health_and_safety_outlined, color: Colors.white, size: 32), SizedBox(width: 12),
+      Expanded(child: Text('HealthCompanion', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)))])),
+    const Padding(padding: EdgeInsets.all(16), child: Align(alignment: Alignment.centerLeft, child: Text('DOCTOR WORKSPACE', style: TextStyle(color: Colors.white60, fontSize: 11, letterSpacing: 1.2)))),
+    Expanded(child: ListView(children: List.generate(_labels.length, (i) => Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(selected: _page == i, selectedTileColor: Colors.white, selectedColor: const Color(0xFF075E5A), textColor: Colors.white70, iconColor: Colors.white70,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), leading: Icon(_icons[i]), title: Text(_labels[i]), onTap: () {
+          setState(() { _page = i; _search = ''; _status = 'all'; }); if (close) Navigator.pop(context);
+        }))))),
+    Padding(padding: const EdgeInsets.all(12), child: ListTile(leading: const Icon(Icons.logout, color: Colors.white70), title: const Text('Sign out', style: TextStyle(color: Colors.white70)), onTap: _logout)),
+  ])));
+
+  Widget _body(Map<String, dynamic> profile) {
+    if (_page == 6) return DoctorProfile(db: _db, uid: _uid!, profile: profile);
+    return StreamBuilder<List<DoctorDoc>>(stream: _appointments, builder: (context, appointments) {
+      if (appointments.hasError) return _messagePanel('Unable to load assigned appointments. Publish the updated rules and check doctor directory links.');
+      if (!appointments.hasData) return const Center(child: CircularProgressIndicator());
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: _assessments, builder: (context, assessments) {
+        if (assessments.hasError) return _messagePanel('Unable to load assessments. Publish the doctor security rules and try again.');
+        if (!assessments.hasData) return const Center(child: CircularProgressIndicator());
+        final visits = appointments.data!, notes = assessments.data!.docs;
+        final stats = DoctorStats(visits.map((a) => a.data()).toList(), notes.map((a) => a.data()).toList(), now: DateTime.now(), days: _days);
+        return SingleChildScrollView(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_labels[_page], style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w800, color: Color(0xFF153C39))),
+            const SizedBox(height: 5), Text('Welcome, ${profile['name'] ?? 'Doctor'}', style: const TextStyle(color: Colors.grey))])), const Icon(Icons.verified_user_outlined, color: Color(0xFF087B75))]),
+          const SizedBox(height: 22),
+          if ([1, 2, 3, 5].contains(_page)) ...[TextField(key: ValueKey('doctor-search-$_page'), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search patient, reason or notes', filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+            onChanged: (v) => setState(() => _search = v.trim().toLowerCase())), const SizedBox(height: 16)],
+          if (_page == 0) ..._overview(visits, stats),
+          if (_page == 1) ..._patients(visits),
+          if (_page == 2) ..._appointmentList(visits),
+          if (_page == 3) ..._assessmentList(notes, visits),
+          if (_page == 4) ..._alerts(visits, notes),
+          if (_page == 5) ..._reports(notes, stats),
+        ]));
+      });
+    });
   }
 
-  // ============================================================
-  // SIDEBAR
-  // ============================================================
-
-  Widget _buildSidebar() {
-    return Container(
-      width: 210,
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF006B67),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 24),
-
-          // LOGO
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.local_hospital,
-                  color: Color(0xFF006B67),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 9),
-              const Text(
-                "Smart Hospital",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 35),
-
-          // MENU
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              itemCount: menuItems.length,
-              itemBuilder: (context, index) {
-                return _buildMenuItem(
-                  index,
-                  menuItems[index],
-                  menuIcons[index],
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+  List<Widget> _overview(List<DoctorDoc> visits, DoctorStats stats) {
+    final pending = visits.where((a) => a.data()['status'] == 'pending').length;
+    final upcoming = visits.where((a) { final date = doctorDate(a.data()['appointmentDate']);
+      return date != null && !date.isBefore(DateTime(stats.now.year, stats.now.month, stats.now.day)) && ['pending', 'confirmed'].contains(a.data()['status']); }).toList();
+    return [Container(width: double.infinity, padding: const EdgeInsets.all(24), decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF075E5A), Color(0xFF18A495)]), borderRadius: BorderRadius.circular(20)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Care, appointments & insights', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white)),
+        const SizedBox(height: 8), Text('$pending appointment requests await your response.', style: const TextStyle(color: Colors.white70)), const SizedBox(height: 16),
+        FilledButton.icon(onPressed: () => setState(() => _page = 2), icon: const Icon(Icons.calendar_today), label: const Text('Manage appointments'))])),
+      const SizedBox(height: 18), Wrap(spacing: 14, runSpacing: 14, children: [_metric('My patients', stats.patientCount, Icons.people_outline), _metric('Today’s visits', stats.todayCount, Icons.calendar_today_outlined),
+        _metric('Pending requests', pending, Icons.pending_actions), _metric('High priority', stats.highPriority, Icons.flag_outlined)]),
+      const SizedBox(height: 28), DoctorInsights(stats: stats, onRange: (d) => setState(() => _days = d)), const SizedBox(height: 28),
+      const Text('Upcoming appointments', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 14),
+      if (upcoming.isEmpty) _empty('No upcoming appointments.') else ...upcoming.take(6).map(_appointmentCard)];
   }
-
-  Widget _buildMenuItem(
-      int index,
-      String title,
-      IconData icon,
-      ) {
-    final bool selected = selectedMenu == index;
-
-    return GestureDetector(
-      onTap: () {
-        if (title == "Logout") {
-          _showLogoutDialog();
-          return;
-        }
-
-        setState(() {
-          selectedMenu = index;
-        });
-      },
-      child: Container(
-        height: 50,
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: selected
-                  ? const Color(0xFF006B67)
-                  : Colors.white,
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected
-                      ? FontWeight.w600
-                      : FontWeight.w400,
-                  color: selected
-                      ? const Color(0xFF006B67)
-                      : Colors.white,
-                ),
-              ),
-            ),
-
-            if (title == "Notifications")
-              Container(
-                width: 20,
-                height: 20,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.redAccent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  "3",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+  Widget _metric(String title, int value, IconData icon) => Container(width: 205, padding: const EdgeInsets.all(20), decoration: _card(), child: Row(children: [
+    CircleAvatar(backgroundColor: const Color(0xFFE2F4F0), child: Icon(icon, color: const Color(0xFF087B75))), const SizedBox(width: 14),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$value', style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w800)), Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey))]))]));
+  bool _matches(Map<String, dynamic> data) => _search.isEmpty || ['patientName', 'patientEmail', 'reason', 'notes', 'symptoms', 'plan', 'priority'].any((key) => (data[key] ?? '').toString().toLowerCase().contains(_search));
+  List<Widget> _appointmentList(List<DoctorDoc> visits) {
+    final filtered = visits.where((a) => (_status == 'all' || a.data()['status'] == _status) && _matches(a.data())).toList();
+    return [Wrap(spacing: 8, runSpacing: 6, children: ['all', 'pending', 'confirmed', 'completed', 'cancelled'].map((s) => ChoiceChip(label: Text(s.toUpperCase()), selected: _status == s, onSelected: (_) => setState(() => _status = s))).toList()),
+      const SizedBox(height: 18), if (filtered.isEmpty) _empty('No matching appointments.') else ...filtered.map(_appointmentCard)];
   }
-
-  // ============================================================
-  // MAIN CONTENT
-  // ============================================================
-
-  Widget _buildMainContent() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double dashboardWidth =
-        math.max(constraints.maxWidth, 1100);
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: dashboardWidth,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  22,
-                  22,
-                  22,
-                  35,
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(),
-
-                    const SizedBox(height: 24),
-
-                    _buildStatistics(),
-
-                    const SizedBox(height: 20),
-
-                    _buildMiddleSection(),
-
-                    const SizedBox(height: 20),
-
-                    _buildBottomSection(),
-
-                    const SizedBox(height: 30),
-
-                    _buildNewAssessment(),
-
-                    const SizedBox(height: 15),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+  Widget _appointmentCard(DoctorDoc doc) {
+    final data = doc.data(), status = (doc.data()['status'] ?? 'pending').toString();
+    return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(18), decoration: _card(), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [const CircleAvatar(backgroundColor: Color(0xFFE2F4F0), child: Icon(Icons.person_outline, color: Color(0xFF087B75))), const SizedBox(width: 12),
+        Expanded(child: Text((data['patientName'] ?? 'Patient').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))), _badge(status)]),
+      const SizedBox(height: 10), Text('${_date(doctorDate(data['appointmentDate']))} • ${data['appointmentTime'] ?? ''}', style: const TextStyle(color: Colors.grey)),
+      if ((data['reason'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 7), child: Text('Reason: ${data['reason']}')),
+      const SizedBox(height: 12), Wrap(spacing: 8, runSpacing: 8, children: [
+        if (['confirmed', 'completed'].contains(status)) OutlinedButton.icon(onPressed: _busy.contains(doc.id) ? null : () => _openPatient(doc), icon: const Icon(Icons.folder_shared_outlined, size: 18), label: const Text('Patient records')),
+        ...doctorNextStatuses(status).map((next) => FilledButton.tonal(onPressed: _busy.contains(doc.id) ? null : () => _statusAction(doc, next), child: Text(next == 'confirmed' ? 'Confirm visit' : next == 'completed' ? 'Complete visit' : 'Cancel visit'))),
+        if (_busy.contains(doc.id)) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))])
+    ]));
   }
-
-  // ============================================================
-  // HEADER
-  // ============================================================
-
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: const BoxDecoration(
-            color: Color(0xFFDDEDEA),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.person,
-            color: Color(0xFF006B67),
-            size: 32,
-          ),
-        ),
-
-        const SizedBox(width: 13),
-
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
-              "Welcome back,",
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey,
-              ),
-            ),
-
-            SizedBox(height: 3),
-
-            Text(
-              "Dr. Rahul Mehta",
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF202020),
-              ),
-            ),
-          ],
-        ),
-
-        const Spacer(),
-
-        // SEARCH
-        Container(
-          width: 240,
-          height: 46,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(
-              color: const Color(0xFFE0EAEA),
-            ),
-          ),
-          child: const TextField(
-            decoration: InputDecoration(
-              prefixIcon: Icon(
-                Icons.search,
-                size: 20,
-                color: Colors.grey,
-              ),
-              hintText: "Search patient...",
-              hintStyle: TextStyle(
-                fontSize: 13,
-              ),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                vertical: 13,
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 16),
-
-        _buildHeaderIcon(
-          Icons.notifications_none,
-          badge: "3",
-        ),
-
-        const SizedBox(width: 10),
-
-        _buildHeaderIcon(
-          Icons.calendar_today_outlined,
-        ),
-
-        const SizedBox(width: 14),
-
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: const Color(0xFFE0EAEA),
-            ),
-          ),
-          child: const Icon(
-            Icons.person,
-            size: 25,
-            color: Color(0xFF006B67),
-          ),
-        ),
-      ],
-    );
+  List<Widget> _patients(List<DoctorDoc> visits) {
+    final groups = <String, List<DoctorDoc>>{};
+    for (final visit in visits) { final id = visit.data()['patientId']; if (id is String && visit.data()['status'] != 'cancelled') groups.putIfAbsent(id, () => []).add(visit); }
+    final matched = groups.values.where((g) => g.any((v) => _matches(v.data()))).toList();
+    if (matched.isEmpty) return [_empty('No assigned patients yet. Patients appear after booking with you.')];
+    return matched.map((group) { final latest = group.last.data(); final eligible = group.where((a) => ['confirmed', 'completed'].contains(a.data()['status'])).toList();
+      return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(18), decoration: _card(), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text((latest['patientName'] ?? 'Patient').toString(), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)), const SizedBox(height: 6), Text('${latest['patientEmail'] ?? ''} • ${group.length} appointments'), const SizedBox(height: 10),
+        if (eligible.isNotEmpty) OutlinedButton.icon(onPressed: () => _openPatient(eligible.last), icon: const Icon(Icons.folder_shared_outlined), label: const Text('Open patient workspace'))
+        else const Text('Confirm an appointment before opening clinical records.', style: TextStyle(color: Colors.grey, fontSize: 12))])); }).toList();
   }
-
-  Widget _buildHeaderIcon(
-      IconData icon, {
-        String? badge,
-      }) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(
-              color: const Color(0xFFE0EAEA),
-            ),
-          ),
-          child: Icon(
-            icon,
-            size: 22,
-            color: const Color(0xFF006B67),
-          ),
-        ),
-
-        if (badge != null)
-          Positioned(
-            right: -4,
-            top: -5,
-            child: Container(
-              width: 19,
-              height: 19,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Colors.redAccent,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                badge,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+  List<Widget> _assessmentList(List<DoctorDoc> notes, List<DoctorDoc> visits) {
+    final eligible = visits.where((a) => ['confirmed', 'completed'].contains(a.data()['status'])).toList();
+    final filtered = notes.where((n) => _matches(n.data())).toList()..sort((a, b) => (doctorDate(b.data()['updatedAt']) ?? DateTime(1970)).compareTo(doctorDate(a.data()['updatedAt']) ?? DateTime(1970)));
+    return [const Text('Record symptoms, notes, a care plan and clinician-selected priority for each visit.', style: TextStyle(color: Colors.grey)), const SizedBox(height: 14),
+      FilledButton.icon(onPressed: eligible.isEmpty ? null : () => _chooseAssessment(eligible), icon: const Icon(Icons.add), label: const Text('New assessment')), const SizedBox(height: 18),
+      if (filtered.isEmpty) _empty('No saved assessments yet.') else ...filtered.map(_assessmentCard)];
   }
-
-  // ============================================================
-  // STATISTICS
-  // ============================================================
-
-  Widget _buildStatistics() {
-    return Row(
-      children: [
-        Expanded(
-          child: _statCard(
-            title: "My Patients",
-            value: "120",
-            subtitle: "Total Assigned",
-            icon: Icons.people_outline,
-            iconColor: const Color(0xFF008C82),
-          ),
-        ),
-
-        const SizedBox(width: 14),
-
-        Expanded(
-          child: _statCard(
-            title: "High-Risk Patients",
-            value: "16",
-            subtitle: "Needs Attention",
-            icon: Icons.favorite_border,
-            iconColor: Colors.redAccent,
-            titleColor: Colors.redAccent,
-          ),
-        ),
-
-        const SizedBox(width: 14),
-
-        Expanded(
-          child: _statCard(
-            title: "Today's Appointments",
-            value: "18",
-            subtitle: "Scheduled",
-            icon: Icons.calendar_month_outlined,
-            iconColor: const Color(0xFF7650C8),
-          ),
-        ),
-
-        const SizedBox(width: 14),
-
-        Expanded(
-          child: _statCard(
-            title: "Critical Alerts",
-            value: "5",
-            subtitle: "New Alerts",
-            icon: Icons.notifications_none,
-            iconColor: Colors.orange,
-            titleColor: Colors.orange,
-          ),
-        ),
-      ],
-    );
+  Widget _assessmentCard(DoctorDoc note) {
+    final x = note.data();
+    return Container(margin: const EdgeInsets.only(bottom: 12), decoration: _card(), child: ListTile(contentPadding: const EdgeInsets.all(18),
+      title: Text((x['patientName'] ?? 'Patient').toString(), style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${x['notes'] ?? ''}\n${_date(doctorDate(x['updatedAt']))}'),
+      isThreeLine: true, trailing: _badge((x['priority'] ?? 'low').toString()), onTap: () => showDialog<void>(context: context, builder: (_) => AlertDialog(title: Text((x['patientName'] ?? 'Assessment').toString()),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final key in ['symptoms', 'notes', 'plan', 'priority']) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('${key.toUpperCase()}\n${x[key] ?? 'Not recorded'}')),
+          Text('Follow-up: ${_date(doctorDate(x['followUpAt']))}')
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]))));
   }
-
-  Widget _statCard({
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    Color? titleColor,
-  }) {
-    return Container(
-      height: 130,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFFE2EAEA),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: titleColor ??
-                        const Color(0xFF007B73),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-
-                const SizedBox(height: 7),
-
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    height: 1.1,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF202020),
-                  ),
-                ),
-
-                const SizedBox(height: 5),
-
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 24,
-            ),
-          ),
-        ],
-      ),
-    );
+  List<Widget> _alerts(List<DoctorDoc> visits, List<DoctorDoc> notes) {
+    final requests = visits.where((a) => a.data()['status'] == 'pending').toList();
+    final latest = DoctorStats(visits.map((a) => a.data()).toList(), notes.map((a) => a.data()).toList(), now: DateTime.now()).latestAssessments;
+    final due = latest.values.where((n) { final date = doctorDate(n['followUpAt']); return date != null && !date.isAfter(DateTime.now()); }).toList();
+    return [const Text('Pending requests and due follow-ups from your saved records.', style: TextStyle(color: Colors.grey)), const SizedBox(height: 18),
+      if (requests.isEmpty && due.isEmpty) _empty('No pending requests or due follow-ups.'), ...requests.map(_appointmentCard),
+      ...due.map((n) => Container(margin: const EdgeInsets.only(bottom: 12), decoration: _card(), child: ListTile(leading: const Icon(Icons.event_repeat, color: Colors.orange), title: Text('Follow-up: ${n['patientName'] ?? 'Patient'}'),
+        subtitle: Text('Due ${_date(doctorDate(n['followUpAt']))}'), trailing: TextButton(onPressed: () => setState(() => _page = 3), child: const Text('Assessments')))))];
   }
-
-  // ============================================================
-  // MIDDLE SECTION
-  // ============================================================
-
-  Widget _buildMiddleSection() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _buildRiskOverview(),
-        ),
-
-        const SizedBox(width: 18),
-
-        Expanded(
-          child: _buildRecentAssessments(),
-        ),
-      ],
-    );
+  List<Widget> _reports(List<DoctorDoc> notes, DoctorStats stats) => [DoctorInsights(stats: stats, onRange: (d) => setState(() => _days = d)), const SizedBox(height: 22),
+    OutlinedButton.icon(onPressed: notes.isEmpty ? null : () async {
+      String cell(dynamic value) => '"${(value ?? '').toString().replaceAll('"', '""')}"';
+      final lines = ['Patient,Priority,Symptoms,Notes,Care plan,Follow-up', ...notes.where((n) => _matches(n.data())).map((n) { final x = n.data();
+        return [x['patientName'], x['priority'], x['symptoms'], x['notes'], x['plan'], _date(doctorDate(x['followUpAt']))].map(cell).join(','); })];
+      await Clipboard.setData(ClipboardData(text: lines.join('\n'))); _toast('Assessment report copied as CSV.');
+    }, icon: const Icon(Icons.copy), label: const Text('Copy assessment report as CSV')), const SizedBox(height: 18), ...notes.where((n) => _matches(n.data())).map(_assessmentCard)];
+  Future<void> _chooseAssessment(List<DoctorDoc> visits) async {
+    final visit = await showDialog<DoctorDoc>(context: context, builder: (context) => SimpleDialog(title: const Text('Choose an appointment'), children: visits.map((a) => SimpleDialogOption(
+      onPressed: () => Navigator.pop(context, a), child: Text('${a.data()['patientName'] ?? 'Patient'} • ${_date(doctorDate(a.data()['appointmentDate']))}'))).toList()));
+    if (visit != null) await _openPatient(visit);
   }
-
-  // ============================================================
-  // RISK OVERVIEW
-  // ============================================================
-
-  Widget _buildRiskOverview() {
-    return _panel(
-      title: "Risk Overview",
-      child: Row(
-        children: [
-          SizedBox(
-            width: 175,
-            height: 175,
-            child: CustomPaint(
-              painter: RiskChartPainter(),
-            ),
-          ),
-
-          const SizedBox(width: 25),
-
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              _riskLegend(
-                Colors.redAccent,
-                "High Risk",
-                "16 (13.3%)",
-              ),
-
-              const SizedBox(height: 22),
-
-              _riskLegend(
-                Colors.orange,
-                "Medium Risk",
-                "62 (51.7%)",
-              ),
-
-              const SizedBox(height: 22),
-
-              _riskLegend(
-                const Color(0xFFFFC13B),
-                "Low Risk",
-                "42 (35.0%)",
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  Future<void> _openPatient(DoctorDoc visit) async {
+    setState(() => _busy.add(visit.id));
+    try { await _repository!.openCare(visit); if (!mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorPatient(db: _db, doctorUid: _uid!, appointment: visit)));
+    } catch (e) { _toast('Cannot open patient records. Confirm the visit, check assignment and publish the updated rules.'); }
+    finally { if (mounted) setState(() => _busy.remove(visit.id)); }
   }
-
-  Widget _riskLegend(
-      Color color,
-      String title,
-      String value,
-      ) {
-    return Row(
-      children: [
-        Container(
-          width: 11,
-          height: 11,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-
-        const SizedBox(width: 9),
-
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-
-        const SizedBox(width: 10),
-
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
+  Future<void> _statusAction(DoctorDoc visit, String status) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text('Mark appointment $status?'), content: const Text('The patient and admin will see the updated status.'), actions: [
+      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Back')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Update'))]));
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy.add(visit.id));
+    try { await _repository!.changeStatus(visit.id, status); _toast('Appointment updated.'); }
+    catch (e) { _toast('Could not update appointment. It may have changed or access may be unavailable.'); }
+    finally { if (mounted) setState(() => _busy.remove(visit.id)); }
   }
-
-  // ============================================================
-  // RECENT ASSESSMENTS
-  // ============================================================
-
-  Widget _buildRecentAssessments() {
-    final patients = [
-      ["P1001", "Raj Sharma", "High", "92%", "10:30 AM"],
-      ["P1002", "Anita Verma", "Medium", "68%", "11:15 AM"],
-      ["P1003", "Mohan Patel", "High", "86%", "12:00 PM"],
-      ["P1004", "Suresh Yadav", "Medium", "74%", "01:10 PM"],
-      ["P1005", "Neha Singh", "Medium", "64%", "02:20 PM"],
-    ];
-
-    return _panel(
-      title: "Recent Patient Assessments",
-      child: Column(
-        children: [
-          _assessmentHeader(),
-
-          const SizedBox(height: 10),
-
-          ...patients.map(
-                (patient) => _assessmentRow(patient),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _assessmentHeader() {
-    return Row(
-      children: const [
-        SizedBox(
-          width: 65,
-          child: Text(
-            "ID",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-
-        Expanded(
-          child: Text(
-            "Patient",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-
-        SizedBox(
-          width: 75,
-          child: Text(
-            "Risk",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-
-        SizedBox(
-          width: 60,
-          child: Text(
-            "Score",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-
-        SizedBox(
-          width: 75,
-          child: Text(
-            "Time",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _assessmentRow(List<String> data) {
-    final bool highRisk = data[2] == "High";
-
-    return Container(
-      height: 48,
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Color(0xFFF0F0F0),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 65,
-            child: Text(
-              data[0],
-              style: const TextStyle(
-                fontSize: 12,
-              ),
-            ),
-          ),
-
-          Expanded(
-            child: Text(
-              data[1],
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-
-          SizedBox(
-            width: 75,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                vertical: 6,
-                horizontal: 6,
-              ),
-              decoration: BoxDecoration(
-                color: highRisk
-                    ? Colors.red.withOpacity(0.08)
-                    : Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Text(
-                data[2],
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: highRisk
-                      ? Colors.redAccent
-                      : Colors.orange,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-
-          SizedBox(
-            width: 60,
-            child: Text(
-              data[3],
-              style: const TextStyle(
-                fontSize: 12,
-              ),
-            ),
-          ),
-
-          SizedBox(
-            width: 75,
-            child: Text(
-              data[4],
-              style: const TextStyle(
-                fontSize: 11,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // BOTTOM SECTION
-  // ============================================================
-
-  Widget _buildBottomSection() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _buildAppointments(),
-        ),
-
-        const SizedBox(width: 18),
-
-        Expanded(
-          child: _buildAlerts(),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // APPOINTMENTS
-  // ============================================================
-
-  Widget _buildAppointments() {
-    final appointments = [
-      ["10:30 AM", "Raj Sharma (P1001)", "Follow Up"],
-      ["11:15 AM", "Anita Verma (P1002)", "Consultation"],
-      ["12:00 PM", "Mohan Patel (P1003)", "Review"],
-      ["01:10 PM", "Suresh Yadav (P1004)", "Checkup"],
-      ["02:20 PM", "Neha Singh (P1005)", "Consultation"],
-    ];
-
-    return _panel(
-      title: "Upcoming Appointments",
-      action: "View All",
-      onAction: () {
-        _showMessage(
-          "Opening all appointments...",
-        );
-      },
-      child: Column(
-        children: appointments.map(
-              (item) {
-            return Container(
-              height: 48,
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: Color(0xFFF0F0F0),
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      item[0],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-
-                  Expanded(
-                    child: Text(
-                      item[1],
-                      style: const TextStyle(
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-
-                  Text(
-                    item[2],
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ).toList(),
-      ),
-    );
-  }
-
-  // ============================================================
-  // ALERTS
-  // ============================================================
-
-  Widget _buildAlerts() {
-    final alerts = [
-      [
-        "P1001 Raj Sharma",
-        "High risk of Pneumonia detected",
-        "10:30 AM",
-        true,
-      ],
-      [
-        "P1003 Mohan Patel",
-        "High blood sugar level detected",
-        "9:45 AM",
-        true,
-      ],
-      [
-        "P1006 Karuna Joshi",
-        "Low SpO2 level detected",
-        "9:20 AM",
-        false,
-      ],
-    ];
-
-    return _panel(
-      title: "Recent Alerts",
-      action: "View All",
-      onAction: () {
-        _showMessage(
-          "Opening all alerts...",
-        );
-      },
-      child: Column(
-        children: alerts.map(
-              (alert) {
-            final bool danger = alert[3] as bool;
-
-            return Container(
-              height: 65,
-              margin: const EdgeInsets.only(
-                bottom: 9,
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: const Color(0xFFECECEC),
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: danger
-                          ? Colors.red.withOpacity(0.08)
-                          : Colors.green.withOpacity(0.08),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      danger
-                          ? Icons.warning_amber_rounded
-                          : Icons.check_circle_outline,
-                      color: danger
-                          ? Colors.redAccent
-                          : Colors.green,
-                      size: 19,
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment:
-                      MainAxisAlignment.center,
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          alert[0] as String,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-
-                        const SizedBox(height: 4),
-
-                        Text(
-                          alert[1] as String,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  Text(
-                    alert[2] as String,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ).toList(),
-      ),
-    );
-  }
-
-  // ============================================================
-  // NEW ASSESSMENT
-  // ============================================================
-
-  Widget _buildNewAssessment() {
-    return Container(
-      height: 90,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5FBFA),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFFD9EEEB),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              color: Color(0xFFE0F4F1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.assignment_add,
-              color: Color(0xFF008C82),
-              size: 25,
-            ),
-          ),
-
-          const SizedBox(width: 15),
-
-          Column(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: const [
-              Text(
-                "Start New Assessment",
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              SizedBox(height: 5),
-
-              Text(
-                "Assess a patient and get AI-powered prediction",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-
-          const Spacer(),
-
-          ElevatedButton(
-            onPressed: () {
-              _showMessage(
-                "New Patient Assessment selected",
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor:
-              const Color(0xFF008C82),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 22,
-                vertical: 15,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius:
-                BorderRadius.circular(7),
-              ),
-            ),
-            child: const Row(
-              children: [
-                Text(
-                  "New Assessment",
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-
-                SizedBox(width: 8),
-
-                Icon(
-                  Icons.arrow_forward,
-                  size: 17,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // COMMON PANEL
-  // ============================================================
-
-  Widget _panel({
-    required String title,
-    required Widget child,
-    String? action,
-    VoidCallback? onAction,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFFE2EAEA),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF202020),
-                ),
-              ),
-
-              const Spacer(),
-
-              if (action != null)
-                GestureDetector(
-                  onTap: onAction,
-                  child: Text(
-                    action,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF008C82),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          child,
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // MESSAGE
-  // ============================================================
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontSize: 14,
-          ),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  // ============================================================
-  // LOGOUT
-  // ============================================================
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            "Logout",
-            style: TextStyle(
-              fontSize: 20,
-            ),
-          ),
-          content: const Text(
-            "Are you sure you want to logout?",
-            style: TextStyle(
-              fontSize: 15,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-
-              },
-              child: const Text(
-                "Cancel",
-                style: TextStyle(
-                  fontSize: 14,
-                ),
-              ),
-            ),
-
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>LoginScreen()));
-                _showMessage(
-                  "Logout selected",
-                );
-              },
-              child: const Text(
-                "Logout",
-                style: TextStyle(
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ============================================================
-// RISK DONUT CHART
-// ============================================================
-
-class RiskChartPainter extends CustomPainter {
-  @override
-  void paint(
-      Canvas canvas,
-      Size size,
-      ) {
-    final center = Offset(
-      size.width / 2,
-      size.height / 2,
-    );
-
-    final radius =
-        math.min(size.width, size.height) / 2 - 12;
-
-    const strokeWidth = 27.0;
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.butt;
-
-    // HIGH RISK
-    paint.color = Colors.redAccent;
-
-    canvas.drawArc(
-      Rect.fromCircle(
-        center: center,
-        radius: radius,
-      ),
-      -math.pi / 2,
-      math.pi * 0.27,
-      false,
-      paint,
-    );
-
-    // MEDIUM RISK
-    paint.color = Colors.orange;
-
-    canvas.drawArc(
-      Rect.fromCircle(
-        center: center,
-        radius: radius,
-      ),
-      -math.pi / 2 + math.pi * 0.27,
-      math.pi * 0.55,
-      false,
-      paint,
-    );
-
-    // LOW RISK
-    paint.color = const Color(0xFFFFC13B);
-
-    canvas.drawArc(
-      Rect.fromCircle(
-        center: center,
-        radius: radius,
-      ),
-      -math.pi / 2 + math.pi * 0.82,
-      math.pi * 0.18,
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(
-      covariant CustomPainter oldDelegate,
-      ) {
-    return false;
-  }
+  Future<void> _logout() async { await FirebaseAuth.instance.signOut(); if (mounted) Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false); }
+  void _toast(String text) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
+  Widget _messagePanel(String message) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(message, textAlign: TextAlign.center),
+    const SizedBox(height: 14), TextButton(onPressed: _logout, child: const Text('Return to sign in'))])));
+  Widget _empty(String text) => Padding(padding: const EdgeInsets.all(24), child: Text(text, style: const TextStyle(color: Colors.grey)));
+  Widget _badge(String text) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: ['high', 'cancelled'].contains(text) ? const Color(0xFFFFECEF) : const Color(0xFFEAF4F2), borderRadius: BorderRadius.circular(20)), child: Text(text.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)));
+  BoxDecoration _card() => BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE1ECE9)));
+  String _date(DateTime? date) => date == null ? 'Not recorded' : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
