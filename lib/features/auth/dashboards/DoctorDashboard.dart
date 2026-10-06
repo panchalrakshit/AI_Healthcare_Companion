@@ -17,7 +17,7 @@ class DoctorDashboard extends StatefulWidget {
 class _DoctorDashboardState extends State<DoctorDashboard> {
   final _db = FirebaseFirestore.instance;
   late final String? _uid = FirebaseAuth.instance.currentUser?.uid;
-  late final DoctorRepository? _repository = _uid == null ? null : DoctorRepository(_db, _uid!);
+  late final DoctorRepository? _repository = _uid == null ? null : DoctorRepository(_db, _uid);
   late final _appointments = _repository?.watchAppointments();
   late final _profile = _uid == null ? null : _db.collection('users').doc(_uid).snapshots();
   late final _assessments = _uid == null ? null : _db.collection('doctorAssessments').where('doctorUid', isEqualTo: _uid).snapshots();

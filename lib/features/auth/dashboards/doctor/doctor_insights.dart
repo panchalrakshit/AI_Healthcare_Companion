@@ -27,17 +27,18 @@ class DoctorInsights extends StatelessWidget {
         return Wrap(spacing: 16, runSpacing: 16, children: [
           SizedBox(width: width, child: _panel('Appointment activity', 'Scheduled dates • $total appointments', [
             if (total == 0) const Padding(padding: EdgeInsets.all(20), child: Text('No appointments in this period.'))
-            else SizedBox(height: 190, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: List.generate(values.length, (i) {
+            else SizedBox(height: 190, child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: SizedBox(
+              width: math.max(width - 44, values.length * 42.0), child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: List.generate(values.length, (i) {
               final date = stats.start.add(Duration(days: i * (stats.days ~/ values.length)));
               return Expanded(child: Tooltip(message: '${date.day}/${date.month}: ${values[i]} appointments', child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3), child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
                   Text('${values[i]}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
                   AnimatedContainer(duration: const Duration(milliseconds: 300), height: 130 * values[i] / maxCount + 2,
                     decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF18B8A6), Color(0xFF087A78)]), borderRadius: BorderRadius.circular(5))),
-                  const SizedBox(height: 7), Text('${date.day}/${date.month}', style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  const SizedBox(height: 7), Text('${date.day}/${date.month}', maxLines: 1, style: const TextStyle(fontSize: 9, color: Colors.grey)),
                 ]),
               )));
-            }))),
+            }))))),
           ])),
           SizedBox(width: width, child: _panel('Appointment outcomes', total == 0 ? 'No outcomes recorded' : '${(completed / total * 100).round()}% completed', [
             if (total == 0) const Text('No outcomes to display.')

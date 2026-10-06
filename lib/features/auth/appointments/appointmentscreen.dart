@@ -664,10 +664,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               reason,
             ),
 
-          if (status.toLowerCase() != "cancelled")
+          if (["pending", "confirmed"].contains(status.toLowerCase()))
             const SizedBox(height: 8),
 
-          if (status.toLowerCase() != "cancelled")
+          if (["pending", "confirmed"].contains(status.toLowerCase()))
             SizedBox(
               width: double.infinity,
               height: 42,
