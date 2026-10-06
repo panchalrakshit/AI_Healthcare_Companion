@@ -1,7 +1,7 @@
 const { test, before, after, beforeEach } = require('node:test');
 const { readFileSync } = require('node:fs');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
-const { doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, query, where } = require('firebase/firestore');
+const { doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, query, where, writeBatch } = require('firebase/firestore');
 let env;
 before(async () => {
   env = await initializeTestEnvironment({ projectId: 'demo-health-admin', firestore: { rules: readFileSync('firestore.rules', 'utf8') } });
@@ -75,4 +75,19 @@ test('booking suspended doctors and accessing data anonymously are blocked', asy
   await env.withSecurityRulesDisabled(async context => updateDoc(doc(context.firestore(), 'doctors', 'legacy-doctor'), { status: 'suspended' }));
   await assertFails(setDoc(doc(user('patient'), 'appointments', 'new'), { patientId: 'patient', doctorId: 'legacy-doctor', status: 'pending' }));
   await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(), 'doctors')));
+});
+
+test('Spark admin can atomically provision and remove app accounts with deletion markers', async () => {
+  const db = user('admin');
+  const create = writeBatch(db);
+  create.set(doc(db, 'users', 'new-doctor'), { uid: 'new-doctor', role: 'doctor', status: 'active' });
+  create.set(doc(db, 'doctors', 'new-doctor'), { uid: 'new-doctor', status: 'active' });
+  await assertSucceeds(create.commit());
+  const remove = writeBatch(db);
+  remove.set(doc(db, 'adminDeletedUsers', 'new-doctor'), { deletedBy: 'admin' });
+  remove.delete(doc(db, 'users', 'new-doctor'));
+  remove.delete(doc(db, 'doctors', 'new-doctor'));
+  await assertSucceeds(remove.commit());
+  await assertFails(setDoc(doc(user('new-doctor'), 'users', 'new-doctor'), { uid: 'new-doctor', email: 'new-doctor@example.com', role: 'patient', status: 'active' }));
+  await assertFails(setDoc(doc(user('patient'), 'adminDeletedUsers', 'other'), { deletedBy: 'patient' }));
 });

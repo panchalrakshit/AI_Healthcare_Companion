@@ -62,7 +62,7 @@ class _AdminAccountDialogState extends State<AdminAccountDialog> {
 
   Widget _field(String key, String label, {bool required = false, bool password = false, TextInputType? type}) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
-    child: TextFormField(controller: _controllers[key], enabled: !_saving, obscureText: password && _hidePassword,
+    child: TextFormField(controller: _controllers[key], enabled: !_saving && !(key == 'email' && widget.initial?['uid'] != null), obscureText: password && _hidePassword,
       keyboardType: type, maxLength: password ? 128 : (key == 'email' ? 254 : key == 'phone' ? 40 : 200),
       decoration: InputDecoration(labelText: label, counterText: '', border: const OutlineInputBorder(),
         suffixIcon: password ? IconButton(onPressed: () => setState(() => _hidePassword = !_hidePassword), icon: Icon(_hidePassword ? Icons.visibility : Icons.visibility_off)) : null),

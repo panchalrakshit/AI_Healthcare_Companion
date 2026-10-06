@@ -22,13 +22,6 @@
       }
     }
   },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "admin",
-      "runtime": "nodejs22"
-    }
-  ],
   "firestore": {
     "rules": "firestore.rules"
   }

@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'admin/admin_account_service.dart';
 import 'admin/admin_analytics.dart';
 import 'admin/admin_account_dialog.dart';
 import '../login/login_screen.dart';
@@ -247,19 +247,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ]));
   }
 
-  Future<void> _call(String name, Map<String, dynamic> data) async {
-    try { await FirebaseFunctions.instanceFor(region: 'us-central1').httpsCallable(name).call(data); }
-    on FirebaseFunctionsException catch (e) {
-      if (['not-found', 'unavailable', 'unimplemented'].contains(e.code)) {
-        throw Exception('Account service is unavailable. Ask the project owner to deploy the admin functions.');
-      }
-      throw Exception(e.message ?? 'Account operation failed (${e.code}).');
-    }
-  }
+  Future<void> _call(String name, Map<String, dynamic> data) => AdminAccountService().run(name, data);
 
   Future<void> _editAccount(String role, {_AdminAccount? account}) async {
     final saved = await showDialog<bool>(context: context, barrierDismissible: false, builder: (_) => AdminAccountDialog(
-      role: role, initial: account?.data, onSave: (fields) => _call(account == null ? 'adminCreateAccount' : 'adminUpdateAccount',
+      role: role, initial: account == null ? null : {...account.data, 'uid': account.uid}, onSave: (fields) => _call(account == null ? 'adminCreateAccount' : 'adminUpdateAccount',
         {...fields, if (account == null) 'role': role, if (account != null) ...account.target}),
     ));
     if (saved == true) _message(account == null ? 'Account created successfully.' : 'Account updated.');
@@ -278,7 +270,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final yes = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Remove account?'),
       content: Text(account.uid == null ? 'Remove $name from the doctor directory?'
-        : 'Remove $name and their login account? Appointment and health history will be retained. This cannot be undone.'),
+        : 'Remove $name from the app and block their access? Appointment and health history will be retained. Their Firebase login account remains; delete it manually in Firebase Console if needed.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove'))],
     ));

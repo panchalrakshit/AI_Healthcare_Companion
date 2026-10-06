@@ -62,6 +62,10 @@ service cloud.firestore {
           || (assignedDoctor(resource.data) && request.resource.data.status in ['pending', 'confirmed', 'completed', 'cancelled'])));
       allow delete: if admin() || (active() && resource.data.patientId == request.auth.uid);
     }
+    match /adminDeletedUsers/{userId} {
+      allow read, create, update: if admin();
+      allow delete: if false;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }
