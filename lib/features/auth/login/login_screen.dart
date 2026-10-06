@@ -65,6 +65,25 @@ class _LoginScreenState extends State<LoginScreen> {
   // LOGIN FUNCTION
   // =========================================================
 
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      _showMessage('Enter your email above, then select Forgot Password.');
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      if (mounted) _showMessage('If an account exists for this email, a password reset link has been sent.');
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _showMessage(e.code == 'too-many-requests'
+        ? 'Too many requests. Please try again later.'
+        : 'Could not send the reset link. Check the email and try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _loginUser() async {
     FocusScope.of(context).unfocus();
 
@@ -928,10 +947,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed:
                     _isLoading
                         ? null
-                        : () {
-                      // Password reset
-                      // will be added later.
-                    },
+                        : _resetPassword,
 
                     child: const Text(
                       "Forgot Password?",

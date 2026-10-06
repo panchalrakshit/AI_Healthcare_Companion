@@ -44,7 +44,7 @@ from accidental deletion/suspension. Use the Firebase Console for admin-role cha
 
 - **Add patient / doctor:** creates Firebase Auth and matching Firestore profiles;
   doctors also get a bookable `doctors/{UID}` directory entry. Patients get an empty
-  health profile. Passwords are never stored in Firestore.
+  health profile. Passwords are never stored in Firestore. The login screen’s Forgot Password action sends a reset link.
 - **Edit:** updates contact details and doctor specialization, qualification,
   experience, hospital and availability. Linked Auth email/display name are updated.
 - **Activate / suspend:** synchronizes directory/profile status and Auth's disabled
@@ -63,7 +63,7 @@ cannot change their own role/status or access another patient's health data.
 
 ```powershell
 node --test functions/test/*.test.js
-flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin test/admin_analytics_test.dart test/admin_account_dialog_test.dart
+flutter analyze --no-fatal-infos --no-fatal-warnings lib/features/auth/dashboards/AdminDashboard.dart lib/features/auth/dashboards/admin lib/features/auth/login/login_screen.dart test/admin_analytics_test.dart test/admin_account_dialog_test.dart
 flutter test test/admin_analytics_test.dart test/admin_account_dialog_test.dart
 
 # Rules tests use a demo project, never the live database. Requires Java 21.
