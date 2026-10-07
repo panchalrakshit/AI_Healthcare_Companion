@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:ai_healthcompanion_using_flutter/features/auth/dashboards/patient/symptom_model.dart';
@@ -52,8 +53,26 @@ void main() {
     expect(find.text('No reliable suggestion'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('supported training pattern displays an educational suggestion and doctor action', (tester) async {
+    var opened = false;
+    final pattern = model.patterns.keys.firstWhere((key) => model.evaluate({for (var i = 0; i < model.features.length; i++) model.features[i]: key[i] == '1'}).supported);
+    final result = model.evaluate({for (var i = 0; i < model.features.length; i++) model.features[i]: pattern[i] == '1'});
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: SymptomChecker(model: Future.value(model), onAppointments: () => opened = true)))));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < model.features.length; i++) {
+      final answer = find.descendant(of: find.byKey(ValueKey('symptom-${model.features[i]}')), matching: find.text(pattern[i] == '1' ? 'Yes' : 'No'));
+      await tester.ensureVisible(answer); await tester.tap(answer); await tester.pumpAndSettle();
+    }
+    await tester.ensureVisible(find.text('Run demo model')); await tester.tap(find.text('Run demo model')); await tester.pumpAndSettle();
+    expect(find.text('Experimental model suggestion'), findsOneWidget);
+    expect(find.text(result.treeSuggestion), findsOneWidget);
+    await tester.ensureVisible(find.text('Find a doctor')); await tester.tap(find.text('Find a doctor')); expect(opened, isTrue);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('model loading errors have a retry action', (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SymptomChecker(model: Future.error(const FormatException('invalid')), onAppointments: () {}))));
+    final pending = Completer<SymptomModel>();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SymptomChecker(model: pending.future, onAppointments: () {}))));
+    pending.completeError(const FormatException('invalid'));
     await tester.pumpAndSettle();
     expect(find.text('Model unavailable'), findsOneWidget); expect(find.text('Retry'), findsOneWidget);
   });
