@@ -27,9 +27,9 @@ class _LoginViewState extends State<LoginView> {
     textTheme: Theme.of(context).textTheme.apply(bodyColor: _ink, displayColor: _ink),
   ), child: Scaffold(backgroundColor: const Color(0xFFF5F3FB), body: SafeArea(child: LayoutBuilder(builder: (context, c) {
     final wide = c.maxWidth >= 1000;
-    return SingleChildScrollView(padding: EdgeInsets.all(wide ? 32 : 18), child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1200),
+    return SingleChildScrollView(padding: EdgeInsets.all(wide ? 32 : 18), child: Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: wide ? 1200 : 560),
       child: Column(children: [
-        Row(children: [const _Brand(), const Spacer(), if (wide) const Text('Your care. Your workspace.', style: TextStyle(color: _muted, fontSize: 12))]),
+        Row(children: [const Expanded(child: _Brand()), if (wide) const Text('Your care. Your workspace.', style: TextStyle(color: _muted, fontSize: 12))]),
         const SizedBox(height: 26),
         Material(color: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28), side: const BorderSide(color: Color(0xFFE5DFF1))), clipBehavior: Clip.antiAlias,
           child: wide ? IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -70,7 +70,7 @@ class _LoginViewState extends State<LoginView> {
     const SizedBox(height: 10), SizedBox(width: double.infinity, height: 52, child: FilledButton(onPressed: widget.busy ? null : _submit,
       style: FilledButton.styleFrom(backgroundColor: _purple, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
       child: widget.busy ? const Row(mainAxisSize: MainAxisSize.min, children: [SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)), SizedBox(width: 12), Text('Please wait…')])
-        : Row(mainAxisSize: MainAxisSize.min, children: [Text('Sign in as ${widget.role}', style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(width: 10), const Icon(Icons.arrow_forward_rounded, size: 18)]))),
+        : Row(mainAxisSize: MainAxisSize.min, children: [Flexible(child: Text('Sign in as ${widget.role}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700))), const SizedBox(width: 10), const Icon(Icons.arrow_forward_rounded, size: 18)]))),
     const SizedBox(height: 20),
     Container(width: double.infinity, padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: const Color(0xFFF7F5FC), borderRadius: BorderRadius.circular(12)),
       child: Text(widget.role == 'Patient' ? 'Your readings, reports and appointments are waiting in your personal workspace.' : widget.role == 'Doctor' ? 'Access assigned appointments, patient records and your clinical workspace.' : 'Manage accounts, appointments and application insights.', style: const TextStyle(fontSize: 12, height: 1.5, color: _muted))),
@@ -89,7 +89,7 @@ class _Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
     Container(width: 42, height: 42, decoration: BoxDecoration(color: _purple, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 24)),
-    const SizedBox(width: 10), const Text('HealthCompanion', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _ink)),
+    const SizedBox(width: 10), const Flexible(child: Text('HealthCompanion', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _ink))),
   ]);
 }
 class _LoginHero extends StatelessWidget {
