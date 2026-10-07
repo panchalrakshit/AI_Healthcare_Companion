@@ -1,0 +1,121 @@
+{
+  "educationalOnly": true,
+  "datasetProvenance": "User-supplied preprocessed CSV; original source unverified",
+  "rawRows": 200,
+  "exactDuplicateRowsRemoved": 77,
+  "uniqueRows": 123,
+  "uniquePatterns": 94,
+  "conflictingPatterns": 21,
+  "trainRows": 100,
+  "testRows": 23,
+  "trainPatterns": 75,
+  "testPatterns": 19,
+  "split": "Grouped by complete symptom vector; seed 42; 20% of groups held out",
+  "patternOverlap": 0,
+  "appPolicyTestCoverage": 0.0,
+  "appPolicy": "Abstain for unseen, conflicting, all-absent or tree/label-disagreement inputs; all grouped test patterns are unseen",
+  "bestParameters": {
+    "max_depth": 3,
+    "min_samples_leaf": 4
+  },
+  "trainingCrossValidationMacroF1": 0.44870129870129866,
+  "testAccuracy": 0.6086956521739131,
+  "testMacroF1": 0.5204545454545455,
+  "baselineAccuracy": 0.17391304347826086,
+  "labels": [
+    "Common Cold",
+    "Dengue",
+    "Influenza",
+    "Malaria",
+    "Typhoid"
+  ],
+  "confusionMatrix": [
+    [
+      4,
+      0,
+      2,
+      0,
+      0
+    ],
+    [
+      0,
+      3,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      2,
+      0,
+      1
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      2
+    ],
+    [
+      0,
+      2,
+      0,
+      1,
+      5
+    ]
+  ],
+  "classificationReport": {
+    "Common Cold": {
+      "precision": 0.8,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.7272727272727273,
+      "support": 6.0
+    },
+    "Dengue": {
+      "precision": 0.6,
+      "recall": 1.0,
+      "f1-score": 0.75,
+      "support": 3.0
+    },
+    "Influenza": {
+      "precision": 0.5,
+      "recall": 0.5,
+      "f1-score": 0.5,
+      "support": 4.0
+    },
+    "Malaria": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 2.0
+    },
+    "Typhoid": {
+      "precision": 0.625,
+      "recall": 0.625,
+      "f1-score": 0.625,
+      "support": 8.0
+    },
+    "accuracy": 0.6086956521739131,
+    "macro avg": {
+      "precision": 0.505,
+      "recall": 0.5583333333333333,
+      "f1-score": 0.5204545454545455,
+      "support": 23.0
+    },
+    "weighted avg": {
+      "precision": 0.591304347826087,
+      "recall": 0.6086956521739131,
+      "f1-score": 0.591897233201581,
+      "support": 23.0
+    }
+  },
+  "limitations": [
+    "Small held-out sample, not clinical validation",
+    "Only five disease labels; other conditions are outside coverage",
+    "Conflicting symptom patterns cannot be resolved from these inputs alone",
+    "Original preprocessing and dataset collection could not be audited",
+    "Leaf distributions are not calibrated medical probabilities"
+  ]
+}
