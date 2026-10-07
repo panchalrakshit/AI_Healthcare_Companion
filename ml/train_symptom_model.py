@@ -15,6 +15,7 @@ import sklearn
 
 FEATURES = ['fever', 'cough', 'headache', 'fatigue', 'vomiting', 'joint_pain',
             'sore_throat', 'runny_nose', 'chills', 'body_pain']
+DISEASES = ['Common Cold', 'Dengue', 'Influenza', 'Malaria', 'Typhoid']
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -25,6 +26,8 @@ def load_data(path):
     if data.isna().any().any():
         raise ValueError('Missing values found. Supply verified symptoms; unknown is not absent.')
     data['disease'] = data['disease'].astype(str).str.strip()
+    if sorted(data['disease'].unique().tolist()) != DISEASES:
+        raise ValueError('Dataset must contain exactly the five documented disease labels.')
     if data['disease'].eq('').any():
         raise ValueError('Disease labels cannot be blank.')
     for feature in FEATURES:

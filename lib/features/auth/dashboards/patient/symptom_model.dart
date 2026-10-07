@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
+const symptomDiseases = ['Common Cold', 'Dengue', 'Influenza', 'Malaria', 'Typhoid'];
 const symptomLabels = {
   'fever': 'Fever', 'cough': 'Cough', 'headache': 'Headache', 'fatigue': 'Fatigue',
   'vomiting': 'Vomiting', 'joint_pain': 'Joint pain', 'sore_throat': 'Sore throat',
@@ -24,14 +25,14 @@ class SymptomModel {
   final int testRows;
   SymptomModel._(this.features, this.classes, this.nodes, this.patterns, this.version, this.testAccuracy, this.macroF1, this.testRows);
 
-  static Future<SymptomModel> load() async => fromJson(await rootBundle.loadString('assets/models/symptom_tree.json'));
+  static Future<SymptomModel> load() async => SymptomModel.fromJson(await rootBundle.loadString('assets/models/symptom_tree.json'));
   factory SymptomModel.fromJson(String text) {
     final value = jsonDecode(text) as Map<String, dynamic>;
     if (value['schemaVersion'] != 1 || value['educationalOnly'] != true) throw const FormatException('Unsupported model format.');
     final features = List<String>.from(value['features'] as List);
     final classes = List<String>.from(value['classes'] as List);
     final nodes = (value['nodes'] as List).map((n) => Map<String, dynamic>.from(n as Map)).toList();
-    if (features.length != symptomLabels.length || features.toSet().length != features.length || features.any((f) => !symptomLabels.containsKey(f)) || classes.isEmpty || nodes.isEmpty) throw const FormatException('Invalid model inputs.');
+    if (features.length != symptomLabels.length || features.toSet().length != features.length || features.any((f) => !symptomLabels.containsKey(f)) || classes.length != symptomDiseases.length || classes.toSet().length != classes.length || classes.any((c) => !symptomDiseases.contains(c)) || nodes.isEmpty) throw const FormatException('Invalid model inputs.');
     for (final node in nodes) {
       final feature = node['feature'] as int;
       final distribution = List<num>.from(node['distribution'] as List);
