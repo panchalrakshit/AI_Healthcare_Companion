@@ -9,6 +9,7 @@ import 'patient/patient_data.dart';
 import 'patient/patient_forms.dart';
 import 'patient/patient_records.dart';
 import 'patient/patient_widgets.dart';
+import 'patient/symptom_checker.dart';
 
 class PatientDashboard extends StatefulWidget {
   const PatientDashboard({super.key});
@@ -131,8 +132,8 @@ class PatientWorkspace extends StatefulWidget {
 class _PatientWorkspaceState extends State<PatientWorkspace> {
   int _page = 0, _days = 30;
   bool _exporting = false;
-  static const _pages = ['Overview', 'Health insights', 'Health records', 'Appointments', 'Reminders', 'My profile'];
-  static const _icons = [Icons.space_dashboard_outlined, Icons.insights_outlined, Icons.folder_outlined, Icons.calendar_month_outlined, Icons.notifications_none_outlined, Icons.person_outline];
+  static const _pages = ['Overview', 'Health insights', 'Health records', 'Appointments', 'Reminders', 'My profile', 'Symptom checker'];
+  static const _icons = [Icons.space_dashboard_outlined, Icons.insights_outlined, Icons.folder_outlined, Icons.calendar_month_outlined, Icons.notifications_none_outlined, Icons.person_outline, Icons.psychology_outlined];
   PatientStats get _stats => PatientStats(widget.data, days: _days);
   void _select(int i) { setState(() => _page = i); }
   Widget _nav({bool drawer = false}) => SizedBox(width: 248, child: Material(color: Colors.white, child: SafeArea(child: Column(children: [
@@ -178,6 +179,7 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
     FilledButton.icon(onPressed: widget.onReading, icon: const Icon(Icons.add, size: 18), label: const Text('Add reading')),
   ]);
   Widget _content() {
+    if (_page == 6) return SymptomChecker(onAppointments: () => _select(3));
     if (widget.data.errors.isNotEmpty) return const PatientPanel(title: 'Live data unavailable', child: Text('Retry the failed sources above to view your current information.'));
     if (widget.data.loading.isNotEmpty) return const PatientPanel(title: 'Connecting to your account', child: Text('Your saved information will appear when loading finishes.'));
     return switch (_page) {

@@ -1,0 +1,596 @@
+{
+  "schemaVersion": 1,
+  "modelVersion": "symptom-demo-v1",
+  "educationalOnly": true,
+  "features": [
+    "fever",
+    "cough",
+    "headache",
+    "fatigue",
+    "vomiting",
+    "joint_pain",
+    "sore_throat",
+    "runny_nose",
+    "chills",
+    "body_pain"
+  ],
+  "classes": [
+    "Common Cold",
+    "Dengue",
+    "Influenza",
+    "Malaria",
+    "Typhoid"
+  ],
+  "nodes": [
+    {
+      "feature": 1,
+      "threshold": 0.5,
+      "left": 1,
+      "right": 8,
+      "distribution": [
+        0.2,
+        0.15,
+        0.25,
+        0.19,
+        0.21
+      ]
+    },
+    {
+      "feature": 5,
+      "threshold": 0.5,
+      "left": 2,
+      "right": 5,
+      "distribution": [
+        0.037037037037037035,
+        0.2222222222222222,
+        0.09259259259259259,
+        0.2962962962962963,
+        0.35185185185185186
+      ]
+    },
+    {
+      "feature": 7,
+      "threshold": 0.5,
+      "left": 3,
+      "right": 4,
+      "distribution": [
+        0.06896551724137931,
+        0.06896551724137931,
+        0.13793103448275862,
+        0.3103448275862069,
+        0.41379310344827586
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        0.0,
+        0.08333333333333333,
+        0.08333333333333333,
+        0.3333333333333333,
+        0.5
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        0.4,
+        0.0,
+        0.4,
+        0.2,
+        0.0
+      ]
+    },
+    {
+      "feature": 8,
+      "threshold": 0.5,
+      "left": 6,
+      "right": 7,
+      "distribution": [
+        0.0,
+        0.4,
+        0.04,
+        0.28,
+        0.28
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        0.0,
+        0.8,
+        0.0,
+        0.0,
+        0.2
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        0.0,
+        0.3,
+        0.05,
+        0.35,
+        0.3
+      ]
+    },
+    {
+      "feature": 9,
+      "threshold": 0.5,
+      "left": 9,
+      "right": 12,
+      "distribution": [
+        0.39130434782608703,
+        0.06521739130434784,
+        0.4347826086956522,
+        0.06521739130434784,
+        0.04347826086956522
+      ]
+    },
+    {
+      "feature": 8,
+      "threshold": 0.5,
+      "left": 10,
+      "right": 11,
+      "distribution": [
+        0.8,
+        0.0,
+        0.15,
+        0.05,
+        0.0
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        0.33333333333333337,
+        0.0,
+        0.5000000000000001,
+        0.16666666666666669,
+        0.0
+      ]
+    },
+    {
+      "feature": 0,
+      "threshold": 0.5,
+      "left": 13,
+      "right": 14,
+      "distribution": [
+        0.07692307692307693,
+        0.11538461538461539,
+        0.6538461538461539,
+        0.07692307692307693,
+        0.07692307692307693
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        0.4,
+        0.0,
+        0.4,
+        0.0,
+        0.2
+      ]
+    },
+    {
+      "feature": -2,
+      "threshold": -2.0,
+      "left": -1,
+      "right": -1,
+      "distribution": [
+        0.0,
+        0.14285714285714285,
+        0.7142857142857143,
+        0.09523809523809523,
+        0.047619047619047616
+      ]
+    }
+  ],
+  "trainingPatterns": {
+    "0001001110": [
+      "Common Cold"
+    ],
+    "0001100011": [
+      "Typhoid"
+    ],
+    "0011010011": [
+      "Dengue",
+      "Typhoid"
+    ],
+    "0100000100": [
+      "Common Cold"
+    ],
+    "0100001101": [
+      "Common Cold"
+    ],
+    "0100001110": [
+      "Common Cold"
+    ],
+    "0100101100": [
+      "Common Cold"
+    ],
+    "0101000000": [
+      "Common Cold"
+    ],
+    "0101001000": [
+      "Common Cold"
+    ],
+    "0110001100": [
+      "Common Cold"
+    ],
+    "0111000100": [
+      "Common Cold"
+    ],
+    "0111001100": [
+      "Common Cold"
+    ],
+    "0111001101": [
+      "Common Cold",
+      "Influenza"
+    ],
+    "0111010001": [
+      "Influenza"
+    ],
+    "0111100011": [
+      "Typhoid"
+    ],
+    "1000000010": [
+      "Malaria",
+      "Typhoid"
+    ],
+    "1000000011": [
+      "Malaria"
+    ],
+    "1001000010": [
+      "Typhoid"
+    ],
+    "1001000011": [
+      "Malaria",
+      "Typhoid"
+    ],
+    "1001000100": [
+      "Common Cold"
+    ],
+    "1001010011": [
+      "Dengue",
+      "Malaria"
+    ],
+    "1001100001": [
+      "Typhoid"
+    ],
+    "1001100010": [
+      "Typhoid"
+    ],
+    "1001100011": [
+      "Dengue",
+      "Malaria",
+      "Typhoid"
+    ],
+    "1001110001": [
+      "Dengue"
+    ],
+    "1001110010": [
+      "Dengue"
+    ],
+    "1001110011": [
+      "Malaria"
+    ],
+    "1010010001": [
+      "Dengue"
+    ],
+    "1010010011": [
+      "Dengue"
+    ],
+    "1010100011": [
+      "Malaria"
+    ],
+    "1010110011": [
+      "Typhoid"
+    ],
+    "1011000000": [
+      "Typhoid"
+    ],
+    "1011000010": [
+      "Influenza",
+      "Malaria",
+      "Typhoid"
+    ],
+    "1011000110": [
+      "Malaria"
+    ],
+    "1011000111": [
+      "Influenza"
+    ],
+    "1011001010": [
+      "Typhoid"
+    ],
+    "1011001101": [
+      "Influenza"
+    ],
+    "1011010001": [
+      "Dengue",
+      "Typhoid"
+    ],
+    "1011010010": [
+      "Malaria"
+    ],
+    "1011010011": [
+      "Dengue",
+      "Malaria",
+      "Typhoid"
+    ],
+    "1011100000": [
+      "Typhoid"
+    ],
+    "1011100001": [
+      "Malaria"
+    ],
+    "1011100011": [
+      "Dengue",
+      "Influenza",
+      "Malaria",
+      "Typhoid"
+    ],
+    "1011110001": [
+      "Dengue"
+    ],
+    "1011110010": [
+      "Malaria"
+    ],
+    "1011110011": [
+      "Dengue",
+      "Malaria",
+      "Typhoid"
+    ],
+    "1011110111": [
+      "Typhoid"
+    ],
+    "1011111011": [
+      "Influenza",
+      "Malaria",
+      "Typhoid"
+    ],
+    "1101000010": [
+      "Influenza"
+    ],
+    "1101000111": [
+      "Influenza"
+    ],
+    "1101001000": [
+      "Common Cold"
+    ],
+    "1101001100": [
+      "Common Cold"
+    ],
+    "1101001110": [
+      "Common Cold"
+    ],
+    "1101011011": [
+      "Influenza"
+    ],
+    "1101100011": [
+      "Influenza",
+      "Malaria"
+    ],
+    "1101111011": [
+      "Influenza"
+    ],
+    "1110001011": [
+      "Influenza"
+    ],
+    "1110001100": [
+      "Common Cold"
+    ],
+    "1110010000": [
+      "Common Cold"
+    ],
+    "1111000001": [
+      "Dengue",
+      "Influenza"
+    ],
+    "1111000010": [
+      "Influenza",
+      "Malaria"
+    ],
+    "1111000011": [
+      "Influenza",
+      "Malaria"
+    ],
+    "1111000100": [
+      "Common Cold"
+    ],
+    "1111000111": [
+      "Influenza"
+    ],
+    "1111001001": [
+      "Influenza"
+    ],
+    "1111001100": [
+      "Common Cold"
+    ],
+    "1111010001": [
+      "Dengue"
+    ],
+    "1111010010": [
+      "Influenza"
+    ],
+    "1111010011": [
+      "Dengue",
+      "Influenza"
+    ],
+    "1111010101": [
+      "Influenza"
+    ],
+    "1111011011": [
+      "Influenza"
+    ],
+    "1111011111": [
+      "Influenza"
+    ],
+    "1111101011": [
+      "Influenza"
+    ],
+    "1111101100": [
+      "Common Cold"
+    ],
+    "1111110011": [
+      "Influenza",
+      "Typhoid"
+    ]
+  },
+  "evaluation": {
+    "educationalOnly": true,
+    "datasetProvenance": "User-supplied preprocessed CSV; original source unverified",
+    "rawRows": 200,
+    "exactDuplicateRowsRemoved": 77,
+    "uniqueRows": 123,
+    "uniquePatterns": 94,
+    "conflictingPatterns": 21,
+    "trainRows": 100,
+    "testRows": 23,
+    "trainPatterns": 75,
+    "testPatterns": 19,
+    "split": "Grouped by complete symptom vector; seed 42; 20% of groups held out",
+    "patternOverlap": 0,
+    "appPolicyTestCoverage": 0.0,
+    "appPolicy": "Abstain for unseen, conflicting, all-absent or tree/label-disagreement inputs; all grouped test patterns are unseen",
+    "bestParameters": {
+      "max_depth": 3,
+      "min_samples_leaf": 4
+    },
+    "trainingCrossValidationMacroF1": 0.44870129870129866,
+    "testAccuracy": 0.6086956521739131,
+    "testMacroF1": 0.5204545454545455,
+    "baselineAccuracy": 0.17391304347826086,
+    "labels": [
+      "Common Cold",
+      "Dengue",
+      "Influenza",
+      "Malaria",
+      "Typhoid"
+    ],
+    "confusionMatrix": [
+      [
+        4,
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        3,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        2,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        2,
+        0,
+        1,
+        5
+      ]
+    ],
+    "classificationReport": {
+      "Common Cold": {
+        "precision": 0.8,
+        "recall": 0.6666666666666666,
+        "f1-score": 0.7272727272727273,
+        "support": 6.0
+      },
+      "Dengue": {
+        "precision": 0.6,
+        "recall": 1.0,
+        "f1-score": 0.75,
+        "support": 3.0
+      },
+      "Influenza": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1-score": 0.5,
+        "support": 4.0
+      },
+      "Malaria": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 2.0
+      },
+      "Typhoid": {
+        "precision": 0.625,
+        "recall": 0.625,
+        "f1-score": 0.625,
+        "support": 8.0
+      },
+      "accuracy": 0.6086956521739131,
+      "macro avg": {
+        "precision": 0.505,
+        "recall": 0.5583333333333333,
+        "f1-score": 0.5204545454545455,
+        "support": 23.0
+      },
+      "weighted avg": {
+        "precision": 0.591304347826087,
+        "recall": 0.6086956521739131,
+        "f1-score": 0.591897233201581,
+        "support": 23.0
+      }
+    },
+    "limitations": [
+      "Small held-out sample, not clinical validation",
+      "Only five disease labels; other conditions are outside coverage",
+      "Conflicting symptom patterns cannot be resolved from these inputs alone",
+      "Original preprocessing and dataset collection could not be audited",
+      "Leaf distributions are not calibrated medical probabilities"
+    ]
+  },
+  "datasetSha256": "f37ec6f645a471924138716409b2c3837d483593c8480243981b986bd59bc570",
+  "sklearnVersion": "1.8.0"
+}

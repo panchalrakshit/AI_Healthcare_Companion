@@ -116,6 +116,9 @@ void main() {
     await tester.tap(find.text('My profile')); await tester.pumpAndSettle();
     expect(find.text('Personal information'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Symptom checker')); await tester.pumpAndSettle();
+    expect(find.text('Symptom checker • college demo'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
   testWidgets('patient workspace renders empty and live error states on mobile', (tester) async {
     tester.view.physicalSize = const Size(320, 1800); tester.view.devicePixelRatio = 1;
