@@ -73,7 +73,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    final content = SingleChildScrollView(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final content = SingleChildScrollView(padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 22), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const Text('Your appointments', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), const Text('Request a visit, follow its status and find your care team.', style: TextStyle(color: patientMuted)), const SizedBox(height: 22),
       Wrap(spacing: 8, runSpacing: 8, children: ['All', 'pending', 'confirmed', 'completed', 'cancelled'].map((s) => ChoiceChip(label: Text(s == 'All' ? s : s.toUpperCase()), selected: _status == s, onSelected: (_) => setState(() => _status = s))).toList()),
@@ -86,15 +86,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         all.sort((a, b) => (patientDate(b['appointmentDate']) ?? DateTime(1900)).compareTo(patientDate(a['appointmentDate']) ?? DateTime(1900)));
         final filtered = all.where((a) => _status == 'All' || a['status'] == _status).toList();
         return PatientPanel(title: 'Visit history', subtitle: '${filtered.length} visits shown • ${all.length} total', child: filtered.isEmpty ? const PatientEmpty('No appointments match this filter.', icon: Icons.calendar_month_outlined)
-          : Column(children: filtered.map((a) => Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: patientBackground, borderRadius: BorderRadius.circular(14)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [Text('${a['doctorName'] ?? 'Doctor'}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)), PatientStatus('${a['status'] ?? 'unknown'}')]),
-              const SizedBox(height: 10), Text('${patientDateLabel(a['appointmentDate'])} • ${a['appointmentTime'] ?? 'Time unavailable'}'),
-              if ((a['specialization'] ?? '').toString().isNotEmpty) Text('${a['specialization']}', style: const TextStyle(color: patientPurple)),
-              if ((a['reason'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text('${a['reason']}')),
-              if (['pending', 'confirmed'].contains(a['status'])) Padding(padding: const EdgeInsets.only(top: 14), child: OutlinedButton.icon(onPressed: _busy.contains(a['id']) ? null : () => _cancel(a),
-                icon: const Icon(Icons.event_busy, size: 18), label: Text(_busy.contains(a['id']) ? 'Cancelling…' : 'Cancel appointment'))),
-            ]))).toList()));
+          : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: filtered.map((a) => PatientAppointmentCard(
+              appointment: a, cancelling: _busy.contains(a['id']), onCancel: () => _cancel(a),
+            )).toList()));
       }),
       const SizedBox(height: 28),
       TextField(onChanged: (v) => setState(() => _query = v.trim().toLowerCase()), decoration: InputDecoration(hintText: 'Find a doctor or specialization', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
@@ -122,6 +116,32 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     ]));
     if (widget.embedded) return content;
     return Scaffold(backgroundColor: patientBackground, appBar: AppBar(title: const Text('Appointments'), backgroundColor: Colors.white), body: content);
+  }
+}
+
+// A bounded, full-width card keeps short and long visits on the same edges.
+class PatientAppointmentCard extends StatelessWidget {
+  final Map<String, dynamic> appointment;
+  final bool cancelling;
+  final VoidCallback onCancel;
+  const PatientAppointmentCard({super.key, required this.appointment, required this.onCancel, this.cancelling = false});
+  @override
+  Widget build(BuildContext context) {
+    final a = appointment;
+    return Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: patientBackground, borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          Text('${a['doctorName'] ?? 'Doctor'}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          PatientStatus('${a['status'] ?? 'unknown'}'),
+        ]),
+        const SizedBox(height: 10), Text('${patientDateLabel(a['appointmentDate'])} • ${a['appointmentTime'] ?? 'Time unavailable'}'),
+        if ((a['specialization'] ?? '').toString().isNotEmpty) Text('${a['specialization']}', style: const TextStyle(color: patientPurple)),
+        if ((a['reason'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text('${a['reason']}')),
+        if (['pending', 'confirmed'].contains(a['status'])) Padding(padding: const EdgeInsets.only(top: 14),
+          child: OutlinedButton.icon(onPressed: cancelling ? null : onCancel,
+            icon: const Icon(Icons.event_busy, size: 18), label: Text(cancelling ? 'Cancelling…' : 'Cancel appointment'))),
+      ]));
   }
 }
 
@@ -170,3 +190,4 @@ class _PatientBookingFormState extends State<PatientBookingForm> {
   ])))), actions: [TextButton(onPressed: _saving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
     FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Requesting…' : 'Request visit'))]));
 }
+
