@@ -157,7 +157,7 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
       drawer: wide ? null : Drawer(child: _nav(drawer: true)),
       appBar: wide ? null : AppBar(title: Text(_pages[_page]), backgroundColor: Colors.white, actions: [IconButton(onPressed: widget.onReading, tooltip: 'Add reading', icon: const Icon(Icons.add_chart))]),
       body: Row(children: [if (wide) _nav(), Expanded(child: _page == 3 ? const AppointmentsScreen(embedded: true) : SingleChildScrollView(
-        key: PageStorageKey('patient-page-$_page'), padding: EdgeInsets.all(wide ? 30 : 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        key: PageStorageKey('patient-page-$_page'), padding: EdgeInsets.all(wide ? 30 : 16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _header(), const SizedBox(height: 24),
           if (widget.data.loading.isNotEmpty) ...[const LinearProgressIndicator(), const SizedBox(height: 14), Text('Loading ${widget.data.loading.join(', ')}…'), const SizedBox(height: 16)],
           if (widget.data.errors.isNotEmpty) ...[Container(width: double.infinity, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(12)),
@@ -171,13 +171,21 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
       ))]),
     );
   }));
-  Widget _header() => Wrap(spacing: 20, runSpacing: 16, crossAxisAlignment: WrapCrossAlignment.center, children: [
-    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(_page == 0 ? 'Welcome, ${widget.data.user['name'] ?? 'Patient'}' : _pages[_page], style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 7), Text(_page == 0 ? 'Your care, records and progress in one place.' : 'Connected to your saved Firebase data', style: const TextStyle(color: patientMuted)),
-    ]),
-    FilledButton.icon(onPressed: widget.onReading, icon: const Icon(Icons.add, size: 18), label: const Text('Add reading')),
-  ]);
+  Widget _header() => LayoutBuilder(builder: (context, constraints) {
+    final compact = constraints.maxWidth < 600;
+    final heading = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(_page == 0 ? 'Welcome, ${widget.data.user['name'] ?? 'Patient'}' : _pages[_page],
+        style: TextStyle(fontSize: compact ? 24 : 28, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 7),
+      Text(_page == 0 ? 'Your care, records and progress in one place.' : 'Connected to your saved Firebase data',
+        style: const TextStyle(color: patientMuted)),
+    ]);
+    final action = FilledButton.icon(onPressed: widget.onReading, icon: const Icon(Icons.add, size: 18), label: const Text('Add reading'));
+    if (compact) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      heading, const SizedBox(height: 16), action,
+    ]);
+    return Row(children: [Expanded(child: heading), const SizedBox(width: 20), action]);
+  });
   Widget _content() {
     if (_page == 6) return SymptomChecker(onAppointments: () => _select(3));
     if (widget.data.errors.isNotEmpty) return const PatientPanel(title: 'Live data unavailable', child: Text('Retry the failed sources above to view your current information.'));
@@ -206,7 +214,10 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
         ])),
       const SizedBox(height: 20),
       LayoutBuilder(builder: (context, c) {
-        final columns = c.maxWidth >= 900 ? 4 : c.maxWidth >= 520 ? 2 : 1;
+        final textScale = MediaQuery.textScalerOf(context).scale(12) / 12;
+        final minCardWidth = 145 * textScale.clamp(1.0, 1.5);
+        final columns = c.maxWidth >= 900 && c.maxWidth >= minCardWidth * 4 + 42
+            ? 4 : c.maxWidth >= minCardWidth * 2 + 14 ? 2 : 1;
         final width = (c.maxWidth - (columns - 1) * 14) / columns;
         return Wrap(spacing: 14, runSpacing: 14, children: [
           _statCard('Upcoming visits', '${stats.upcoming.length}', Icons.calendar_month, 'Appointments', () => _select(3)),
@@ -217,7 +228,7 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
       }),
       const SizedBox(height: 20),
       PatientPanel(title: 'Latest health profile', subtitle: data.profile.isEmpty ? 'Add your first measured reading' : 'Last saved: ${patientDateLabel(data.profile['updatedAt'] ?? data.profile['lastCheckup'])}',
-        child: Wrap(spacing: 12, runSpacing: 12, children: [
+        child: _vitalGrid([
           ...patientMetrics.map((m) => _vitalTile(m.label, data.profile[m.key], m.unit)),
           _vitalTile('Blood pressure', data.profile['bloodPressure'], 'mmHg'), _vitalTile('BMI', data.profile['bmi'], 'kg/m²'),
         ])),
@@ -236,13 +247,20 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
     final loading = widget.data.loading.contains(source);
     return Material(color: Colors.white, borderRadius: BorderRadius.circular(16), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(16), child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, color: patientPurple), const SizedBox(height: 14), Text(unavailable || loading ? '—' : value, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 5), Text(title, style: const TextStyle(fontSize: 12, color: patientMuted)),
+      const SizedBox(height: 5), ConstrainedBox(constraints: BoxConstraints(minHeight: MediaQuery.textScalerOf(context).scale(12) * 2.5), child: Text(title, style: const TextStyle(fontSize: 12, color: patientMuted))),
     ]))));
   }
+  Widget _vitalGrid(List<Widget> tiles) => LayoutBuilder(builder: (context, constraints) {
+    final textScale = MediaQuery.textScalerOf(context).scale(12) / 12;
+    final minWidth = 140 * textScale.clamp(1.0, 1.5);
+    final columns = ((constraints.maxWidth + 12) / (minWidth + 12)).floor().clamp(1, 6);
+    final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
+    return Wrap(spacing: 12, runSpacing: 12, children: tiles.map((tile) => SizedBox(width: width, child: tile)).toList());
+  });
   Widget _vitalTile(String label, dynamic value, String unit) {
     final n = patientNumber(value);
     final display = value == null || '$value'.isEmpty ? 'Not recorded' : n != null ? n.toStringAsFixed(1) : '$value';
-    return Container(width: 174, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: patientBackground, borderRadius: BorderRadius.circular(12)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: patientBackground, borderRadius: BorderRadius.circular(12)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: const TextStyle(color: patientMuted, fontSize: 12)), const SizedBox(height: 10), Text(display, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
       if (display != 'Not recorded') Text(unit, style: const TextStyle(color: patientMuted, fontSize: 11)),
     ]));
@@ -267,7 +285,7 @@ class _PatientWorkspaceState extends State<PatientWorkspace> {
       ]))),
       OutlinedButton.icon(onPressed: widget.onResetPassword, icon: const Icon(Icons.lock_reset), label: const Text('Send password reset email')),
     ])),
-    PatientPanel(title: 'Health information', subtitle: 'Your latest saved measurements', action: TextButton(onPressed: widget.onReading, child: const Text('Add reading')), child: Wrap(spacing: 12, runSpacing: 12, children: [
+    PatientPanel(title: 'Health information', subtitle: 'Your latest saved measurements', action: TextButton(onPressed: widget.onReading, child: const Text('Add reading')), child: _vitalGrid([
       ...patientMetrics.map((m) => _vitalTile(m.label, widget.data.profile[m.key], m.unit)),
       _vitalTile('Blood pressure', widget.data.profile['bloodPressure'], 'mmHg'), _vitalTile('Height', widget.data.profile['height'], 'cm'), _vitalTile('BMI', widget.data.profile['bmi'], 'kg/m²'),
     ])),
@@ -291,3 +309,4 @@ String patientRecordsCsv(List<Map<String, dynamic>> records) {
   }
   return ['title,type,date,doctor,clinic,description,vitals', ...records.map((r) => [r['title'], r['recordType'], patientDateLabel(r['recordDate']), r['doctorName'], r['hospitalName'], r['description'], r['vitals'] is Map ? (r['vitals'] as Map).entries.map((e) => '${e.key}: ${e.value}').join('; ') : ''].map(cell).join(','))].join('\n');
 }
+
