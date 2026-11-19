@@ -6,6 +6,7 @@ import '../login/login_screen.dart';
 import 'doctor/doctor_data.dart';
 import 'doctor/doctor_insights.dart';
 import 'doctor/doctor_patient.dart';
+import 'doctor/doctor_panel_widgets.dart';
 import 'doctor/doctor_profile.dart';
 
 class DoctorDashboard extends StatefulWidget {
@@ -110,7 +111,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     final data = doc.data(), status = (doc.data()['status'] ?? 'pending').toString();
     return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(18), decoration: _card(), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [const CircleAvatar(backgroundColor: Color(0xFFE2F4F0), child: Icon(Icons.person_outline, color: Color(0xFF087B75))), const SizedBox(width: 12),
-        Expanded(child: Text((data['patientName'] ?? 'Patient').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))), _badge(status)]),
+        Expanded(child: Text((data['patientName'] ?? 'Patient').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))), _badge(status)]),
       const SizedBox(height: 10), Text('${_date(doctorDate(data['appointmentDate']))} • ${data['appointmentTime'] ?? ''}', style: const TextStyle(color: Colors.grey)),
       if ((data['reason'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 7), child: Text('Reason: ${data['reason']}')),
       const SizedBox(height: 12), Wrap(spacing: 8, runSpacing: 8, children: [
@@ -121,14 +122,27 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
   List<Widget> _patients(List<DoctorDoc> visits) {
     final groups = <String, List<DoctorDoc>>{};
-    for (final visit in visits) { final id = visit.data()['patientId']; if (id is String && visit.data()['status'] != 'cancelled') groups.putIfAbsent(id, () => []).add(visit); }
+    for (final visit in visits) {
+      final id = visit.data()['patientId'];
+      if (id is String && visit.data()['status'] != 'cancelled') {
+        groups.putIfAbsent(id, () => []).add(visit);
+      }
+    }
     final matched = groups.values.where((g) => g.any((v) => _matches(v.data()))).toList();
-    if (matched.isEmpty) return [_empty('No assigned patients yet. Patients appear after booking with you.')];
-    return matched.map((group) { final latest = group.last.data(); final eligible = group.where((a) => ['confirmed', 'completed'].contains(a.data()['status'])).toList();
-      return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(18), decoration: _card(), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text((latest['patientName'] ?? 'Patient').toString(), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)), const SizedBox(height: 6), Text('${latest['patientEmail'] ?? ''} • ${group.length} appointments'), const SizedBox(height: 10),
-        if (eligible.isNotEmpty) OutlinedButton.icon(onPressed: () => _openPatient(eligible.last), icon: const Icon(Icons.folder_shared_outlined), label: const Text('Open patient workspace'))
-        else const Text('Confirm an appointment before opening clinical records.', style: TextStyle(color: Colors.grey, fontSize: 12))])); }).toList();
+    if (matched.isEmpty) {
+      return [_empty('No assigned patients yet. Patients appear after booking with you.')];
+    }
+    return matched.map((group) {
+      final latest = group.last.data();
+      final eligible = group.where((a) => ['confirmed', 'completed'].contains(a.data()['status'])).toList();
+      return DoctorPatientCard(
+        name: (latest['patientName'] ?? 'Patient').toString(),
+        email: (latest['patientEmail'] ?? '').toString(),
+        appointmentCount: group.length,
+        accessHint: 'Confirm an appointment before opening clinical records.',
+        onOpen: eligible.isEmpty ? null : () => _openPatient(eligible.last),
+      );
+    }).toList();
   }
   List<Widget> _assessmentList(List<DoctorDoc> notes, List<DoctorDoc> visits) {
     final eligible = visits.where((a) => ['confirmed', 'completed'].contains(a.data()['status'])).toList();
@@ -139,22 +153,66 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
   Widget _assessmentCard(DoctorDoc note) {
     final x = note.data();
-    return Container(margin: const EdgeInsets.only(bottom: 12), decoration: _card(), child: ListTile(contentPadding: const EdgeInsets.all(18),
-      title: Text((x['patientName'] ?? 'Patient').toString(), style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${x['notes'] ?? ''}\n${_date(doctorDate(x['updatedAt']))}'),
-      isThreeLine: true, trailing: _badge((x['priority'] ?? 'low').toString()), onTap: () => showDialog<void>(context: context, builder: (_) => AlertDialog(title: Text((x['patientName'] ?? 'Assessment').toString()),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final key in ['symptoms', 'notes', 'plan', 'priority']) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('${key.toUpperCase()}\n${x[key] ?? 'Not recorded'}')),
-          Text('Follow-up: ${_date(doctorDate(x['followUpAt']))}')
-        ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]))));
+    return DoctorAssessmentCard(
+      patientName: (x['patientName'] ?? 'Patient').toString(),
+      notes: (x['notes'] ?? '').toString(),
+      updatedLabel: 'Updated ${_date(doctorDate(x['updatedAt']))}',
+      priority: (x['priority'] ?? 'low').toString(),
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text((x['patientName'] ?? 'Assessment').toString()),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final key in ['symptoms', 'notes', 'plan', 'priority'])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text('${key.toUpperCase()}\\n${x[key] ?? 'Not recorded'}'),
+                  ),
+                Text('Follow-up: ${_date(doctorDate(x['followUpAt']))}'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
   List<Widget> _alerts(List<DoctorDoc> visits, List<DoctorDoc> notes) {
     final requests = visits.where((a) => a.data()['status'] == 'pending').toList();
-    final latest = DoctorStats(visits.map((a) => a.data()).toList(), notes.map((a) => a.data()).toList(), now: DateTime.now()).latestAssessments;
-    final due = latest.values.where((n) { final date = doctorDate(n['followUpAt']); return date != null && !date.isAfter(DateTime.now()); }).toList();
-    return [const Text('Pending requests and due follow-ups from your saved records.', style: TextStyle(color: Colors.grey)), const SizedBox(height: 18),
-      if (requests.isEmpty && due.isEmpty) _empty('No pending requests or due follow-ups.'), ...requests.map(_appointmentCard),
-      ...due.map((n) => Container(margin: const EdgeInsets.only(bottom: 12), decoration: _card(), child: ListTile(leading: const Icon(Icons.event_repeat, color: Colors.orange), title: Text('Follow-up: ${n['patientName'] ?? 'Patient'}'),
-        subtitle: Text('Due ${_date(doctorDate(n['followUpAt']))}'), trailing: TextButton(onPressed: () => setState(() => _page = 3), child: const Text('Assessments')))))];
+    final latest = DoctorStats(
+      visits.map((a) => a.data()).toList(),
+      notes.map((a) => a.data()).toList(),
+      now: DateTime.now(),
+    ).latestAssessments;
+    final due = latest.values.where((n) {
+      final date = doctorDate(n['followUpAt']);
+      return date != null && !date.isAfter(DateTime.now());
+    }).toList();
+
+    return [
+      const Text(
+        'Pending requests and due follow-ups from your saved records.',
+        style: TextStyle(color: Colors.grey),
+      ),
+      const SizedBox(height: 18),
+      if (requests.isEmpty && due.isEmpty)
+        _empty('No pending requests or due follow-ups.'),
+      ...requests.map(_appointmentCard),
+      ...due.map((n) => DoctorFollowUpCard(
+            patientName: (n['patientName'] ?? 'Patient').toString(),
+            dueLabel: _date(doctorDate(n['followUpAt'])),
+            onOpenAssessments: () => setState(() => _page = 3),
+          )),
+    ];
   }
   List<Widget> _reports(List<DoctorDoc> notes, DoctorStats stats) => [DoctorInsights(stats: stats, onRange: (d) => setState(() => _days = d)), const SizedBox(height: 22),
     OutlinedButton.icon(onPressed: notes.isEmpty ? null : () async {
