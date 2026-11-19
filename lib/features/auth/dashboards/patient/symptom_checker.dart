@@ -34,7 +34,11 @@ class _SymptomCheckerState extends State<SymptomChecker> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       PatientPanel(title: 'Symptom checker • college demo', subtitle: 'Runs locally on your device. Inputs are not sent to a prediction server or saved.', child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('This experimental model covers only Common Cold, Influenza, Malaria, Dengue and Typhoid. It cannot diagnose or rule out these or other conditions.', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12), Text('Grouped held-out test: ${(model.testAccuracy * 100).toStringAsFixed(1)}% accuracy across ${model.testRows} rows; macro F1 ${model.macroF1.toStringAsFixed(2)}. This score evaluates the bare tree, before the app withholds unsupported inputs. Small, unverified-source dataset; not clinically validated.', style: const TextStyle(color: patientMuted, fontSize: 12)),
+        const SizedBox(height: 12),
+        Text(
+          'Grouped hold-out evaluation: ${(model.testAccuracy * 100).toStringAsFixed(1)}% accuracy across ${model.testRows} rows; macro F1 ${model.macroF1.toStringAsFixed(2)}. ${model.version == 'symptom-demo-v2' ? 'The on-device tree was refitted on all validated dataset rows after this separate evaluation.' : 'The current bundled tree was trained on the training fold only; patterns held out for testing are not in its support list.'} These metrics are not clinical validation. Small, unverified-source dataset.',
+          style: const TextStyle(color: patientMuted, fontSize: 12),
+        ),
         const SizedBox(height: 16), const Text('Answer Yes or No for each symptom. Leave an answer blank if unsure; the checker needs complete inputs.'),
         const SizedBox(height: 18),
         ...model.features.map((f) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [
