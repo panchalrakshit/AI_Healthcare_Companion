@@ -37,6 +37,29 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(patientId)).data.role == 'patient'
         && get(/databases/$(database)/documents/users/$(patientId)).data.status == 'active';
     }
+    function validPatientAppointment(data) {
+      return data.keys().hasAll([
+          'patientId', 'patientName', 'patientEmail', 'doctorId', 'doctorName',
+          'specialization', 'status', 'createdAt', 'appointmentDate',
+          'appointmentTime', 'reason'
+        ])
+        && data.keys().hasOnly([
+          'patientId', 'patientName', 'patientEmail', 'doctorId', 'doctorName',
+          'specialization', 'status', 'createdAt', 'appointmentDate',
+          'appointmentTime', 'reason'
+        ])
+        && data.patientId is string
+        && data.patientName is string && data.patientName.size() <= 200
+        && data.patientEmail is string && data.patientEmail.size() <= 320
+        && data.doctorId is string && data.doctorId.size() > 0 && data.doctorId.size() <= 128
+        && data.doctorName is string && data.doctorName.size() <= 200
+        && data.specialization is string && data.specialization.size() <= 200
+        && data.reason is string && data.reason.size() > 0 && data.reason.size() <= 2000
+        && data.appointmentDate is timestamp
+        && data.appointmentTime is string && data.appointmentTime.size() <= 40
+        && data.status == 'pending'
+        && data.createdAt is timestamp;
+    }
     function validAssessment(data) {
       return data.keys().hasOnly(['doctorUid', 'patientId', 'appointmentId', 'patientName', 'symptoms', 'notes', 'plan', 'priority', 'followUpAt', 'createdAt', 'updatedAt'])
         && data.patientName is string && data.patientName.size() <= 200
@@ -83,13 +106,14 @@ service cloud.firestore {
     }
     match /appointments/{appointmentId} {
       allow create: if admin() || (patient()
+        && validPatientAppointment(request.resource.data)
         && request.resource.data.patientId == request.auth.uid
-        && request.resource.data.status == 'pending'
         && get(/databases/$(database)/documents/doctors/$(request.resource.data.doctorId)).data.get('status', 'active') == 'active');
       allow read: if admin() || (active() && resource.data.patientId == request.auth.uid) || assignedDoctor(resource.data);
       allow update: if admin() || (
         active()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.updatedAt is timestamp
         && ((resource.data.patientId == request.auth.uid && resource.data.status in ['pending', 'confirmed'] && request.resource.data.status == 'cancelled')
           || (assignedDoctor(resource.data)
             && ((resource.data.status == 'pending' && request.resource.data.status in ['confirmed', 'cancelled'])

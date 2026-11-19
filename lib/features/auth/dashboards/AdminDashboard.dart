@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'admin/admin_account_service.dart';
+import 'admin/admin_appointment_card.dart';
 import 'admin/admin_analytics.dart';
 import 'admin/admin_account_dialog.dart';
 import '../login/login_screen.dart';
@@ -21,7 +22,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final Set<String> _busy = {};
   late final _usersStream = _db.collection('users').snapshots();
   late final _doctorsStream = _db.collection('doctors').snapshots();
-  late final _appointmentsStream = _db.collection('appointments').snapshots();
+  late Stream<QuerySnapshot<Map<String, dynamic>>> _appointmentsStream = _db.collection('appointments').snapshots();
   static const _titles = ['Overview', 'Patients', 'Doctors', 'Appointments'];
   static const _icons = [Icons.dashboard_outlined, Icons.people_outline, Icons.medical_services_outlined, Icons.calendar_month_outlined];
 
@@ -277,85 +278,128 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (yes == true) await _accountAction(account, 'adminDeleteAccount', {});
   }
 
+  void _retryAppointments() {
+    setState(() {
+      _appointmentsStream = _db.collection('appointments').snapshots();
+    });
+  }
+
   Widget _appointments() => _shell(
     'Appointments',
     'Review and update appointment status.',
     StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _appointmentsStream,
-      builder: (context, s) {
-        if (s.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (s.hasError) return _error('Unable to load appointments.');
-        var docs = s.data?.docs ?? [];
-        docs.sort((a, b) {
-          final ad = a.data()['appointmentDate'];
-          final bd = b.data()['appointmentDate'];
-          if (ad is Timestamp && bd is Timestamp) return bd.compareTo(ad);
-          return 0;
-        });
-        docs = docs.where((d) => _filter == 'all' || (d.data()['status'] ?? 'pending') == _filter).toList();
-        if (_search.isNotEmpty) {
-          docs = docs.where((d) {
-            final x = d.data();
-            return ['doctorName', 'patientName', 'patientEmail', 'reason', 'status', 'specialization'].map((k) => (x[k] ?? '').toString().toLowerCase()).any((v) => v.contains(_search));
-          }).toList();
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
         }
-        if (docs.isEmpty) return _empty('No appointments found.');
+        if (snapshot.hasError) return _appointmentLoadError(snapshot.error);
+
+        final docs = [...?snapshot.data?.docs];
+        docs.sort((a, b) {
+          final aDate = adminDate(a.data()['appointmentDate']);
+          final bDate = adminDate(b.data()['appointmentDate']);
+          if (aDate == null) return bDate == null ? 0 : 1;
+          if (bDate == null) return -1;
+          return bDate.compareTo(aDate);
+        });
+
+        final filtered = docs.where((doc) {
+          final data = doc.data();
+          final status = (data['status'] ?? 'pending').toString().toLowerCase();
+          final matchesStatus = _filter == 'all' || status == _filter;
+          if (!matchesStatus) return false;
+          if (_search.isEmpty) return true;
+          return [
+            'doctorName',
+            'patientName',
+            'patientEmail',
+            'reason',
+            'status',
+            'specialization',
+          ].any((key) => (data[key] ?? '').toString().toLowerCase().contains(_search));
+        }).toList();
+
+        if (filtered.isEmpty) return _empty('No appointments found.');
         return ListView.separated(
-          padding: const EdgeInsets.all(28),
-          itemCount: docs.length,
+          padding: const EdgeInsets.all(22),
+          itemCount: filtered.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (_, i) => _appointmentTile(docs[i]),
+          itemBuilder: (_, index) => _appointmentTile(filtered[index]),
         );
       },
     ),
     search: true,
   );
 
-  Widget _appointmentTile(QueryDocumentSnapshot<Map<String, dynamic>> doc, {bool compact = false}) {
-    final x = doc.data();
-    final doctor = (x['doctorName'] ?? 'Doctor').toString();
-    final patient = (x['patientName'] ?? x['patientEmail'] ?? 'Patient').toString();
-    final status = (x['status'] ?? 'pending').toString().toLowerCase();
-    final reason = (x['reason'] ?? '').toString();
-    final date = x['appointmentDate'];
-    String dateText = 'Date not set';
-    if (date is Timestamp) {
-      final d = date.toDate();
-      dateText = d.day.toString().padLeft(2, '0') + '/' + d.month.toString().padLeft(2, '0') + '/' + d.year.toString();
-    }
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: compact ? null : _card(),
-      child: Row(children: [
-        const CircleAvatar(backgroundColor: Color(0xFFEFE7FF), child: Icon(Icons.calendar_today, color: Color(0xFF6335D6), size: 20)),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(patient + ' → ' + doctor, style: const TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(dateText + (reason.isEmpty ? '' : ' • ' + reason), style: const TextStyle(fontSize: 12, color: Color(0xFF777384))),
-        ])),
-        _status(status),
-        if (!compact) ...[
-          const SizedBox(width: 8),
-          PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'delete') { _deleteAppointment(doc); }
-              else { _setAppointmentStatus(doc.id, v); }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'pending', child: Text('Mark pending')),
-              PopupMenuItem(value: 'confirmed', child: Text('Confirm')),
-              PopupMenuItem(value: 'completed', child: Text('Mark completed')),
-              PopupMenuItem(value: 'cancelled', child: Text('Cancel')),
-              PopupMenuDivider(),
-              PopupMenuItem(value: 'delete', child: Text('Delete appointment')),
+  Widget _appointmentLoadError(Object? error) {
+    final detail = error is FirebaseException
+        ? 'Firestore error: ${error.code}'
+        : 'An unexpected error occurred while loading appointment data.';
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_outlined, color: Colors.redAccent, size: 38),
+              const SizedBox(height: 12),
+              const Text(
+                'Appointments could not be loaded',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+              ),
+              const SizedBox(height: 8),
+              Text(detail, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF777384))),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: _retryAppointments,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+              if (error is FirebaseException && error.code == 'permission-denied')
+                const Padding(
+                  padding: EdgeInsets.only(top: 10),
+                  child: Text(
+                    'Check that this account has role=admin and status=active in users/{uid}, then publish the current firestore.rules.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFF777384)),
+                  ),
+                ),
             ],
           ),
-        ],
-      ]),
+        ),
+      ),
     );
   }
 
+  Widget _appointmentTile(QueryDocumentSnapshot<Map<String, dynamic>> doc, {bool compact = false}) {
+    final data = doc.data();
+    final date = adminDate(data['appointmentDate']);
+    final dateLabel = date == null
+        ? 'Date not set'
+        : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} • ${(data['appointmentTime'] ?? 'Time not set')}';
+    final busyKey = 'appointment:${doc.id}';
+
+    return AdminAppointmentCard(
+      patientName: (data['patientName'] ?? data['patientEmail'] ?? 'Patient').toString(),
+      doctorName: (data['doctorName'] ?? 'Doctor').toString(),
+      status: (data['status'] ?? 'pending').toString(),
+      dateLabel: dateLabel,
+      reason: (data['reason'] ?? '').toString(),
+      compact: compact,
+      busy: _busy.contains(busyKey),
+      onAction: (value) {
+        if (value == 'delete') {
+          _deleteAppointment(doc);
+        } else {
+          _setAppointmentStatus(doc.id, value);
+        }
+      },
+    );
+  }
   Widget _status(String value) {
     Color color;
     if (['active', 'confirmed', 'completed'].contains(value)) {
@@ -373,23 +417,55 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _setAppointmentStatus(String id, String status) async {
+    final busyKey = 'appointment:$id';
+    if (_busy.contains(busyKey)) return;
+    setState(() => _busy.add(busyKey));
     try {
-      await _db.collection('appointments').doc(id).update({'status': status, 'updatedAt': FieldValue.serverTimestamp()});
-      _message('Appointment marked ' + status + '.');
-    } catch (e) { _message('Could not update appointment: ' + e.toString()); }
-  }
-
-  Future<void> _deleteAppointment(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
-    final yes = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Delete appointment?'), content: const Text('This permanently removes the appointment record.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete'))]));
-    if (yes == true) {
-      try { await doc.reference.delete(); _message('Appointment deleted.'); }
-      catch (e) { _message('Could not delete appointment: $e'); }
+      final ref = _db.collection('appointments').doc(id);
+      await _db.runTransaction((transaction) async {
+        final snapshot = await transaction.get(ref);
+        if (!snapshot.exists) throw StateError('This appointment no longer exists.');
+        transaction.update(ref, {
+          'status': status,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+      _message('Appointment marked $status.');
+    } catch (error) {
+      final detail = error is FirebaseException ? error.code : error.toString();
+      _message('Could not update appointment ($detail). Check admin permissions and try again.');
+    } finally {
+      if (mounted) setState(() => _busy.remove(busyKey));
     }
   }
 
+  Future<void> _deleteAppointment(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete appointment?'),
+        content: const Text('This permanently removes the appointment record.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (yes != true || !mounted) return;
+
+    final busyKey = 'appointment:${doc.id}';
+    if (_busy.contains(busyKey)) return;
+    setState(() => _busy.add(busyKey));
+    try {
+      await doc.reference.delete();
+      _message('Appointment deleted.');
+    } catch (error) {
+      final detail = error is FirebaseException ? error.code : error.toString();
+      _message('Could not delete appointment ($detail). Check admin permissions and try again.');
+    } finally {
+      if (mounted) setState(() => _busy.remove(busyKey));
+    }
+  }
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
