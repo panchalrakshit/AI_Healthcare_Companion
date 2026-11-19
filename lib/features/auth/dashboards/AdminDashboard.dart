@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'admin/admin_account_service.dart';
+import 'admin/admin_appointment_card.dart';
 import 'admin/admin_analytics.dart';
 import 'admin/admin_account_dialog.dart';
 import '../login/login_screen.dart';
@@ -376,133 +377,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _appointmentTile(QueryDocumentSnapshot<Map<String, dynamic>> doc, {bool compact = false}) {
     final data = doc.data();
-    final doctor = (data['doctorName'] ?? 'Doctor').toString();
-    final patient = (data['patientName'] ?? data['patientEmail'] ?? 'Patient').toString();
-    final status = (data['status'] ?? 'pending').toString().toLowerCase();
-    final reason = (data['reason'] ?? '').toString();
     final date = adminDate(data['appointmentDate']);
-    final dateText = date == null
+    final dateLabel = date == null
         ? 'Date not set'
         : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} • ${(data['appointmentTime'] ?? 'Time not set')}';
     final busyKey = 'appointment:${doc.id}';
-    final isBusy = _busy.contains(busyKey);
 
-    Widget menu() => PopupMenuButton<String>(
-          enabled: !isBusy,
-          tooltip: 'Appointment actions',
-          onSelected: (value) {
-            if (value == 'delete') {
-              _deleteAppointment(doc);
-            } else {
-              _setAppointmentStatus(doc.id, value);
-            }
-          },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'pending', child: Text('Mark pending')),
-            PopupMenuItem(value: 'confirmed', child: Text('Confirm')),
-            PopupMenuItem(value: 'completed', child: Text('Mark completed')),
-            PopupMenuItem(value: 'cancelled', child: Text('Cancel')),
-            PopupMenuDivider(),
-            PopupMenuItem(value: 'delete', child: Text('Delete appointment')),
-          ],
-        );
-
-    final description = dateText + (reason.isEmpty ? '' : ' • $reason');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: compact ? null : _card(),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 540;
-          final heading = Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const CircleAvatar(
-                backgroundColor: Color(0xFFEFE7FF),
-                child: Icon(Icons.calendar_today, color: Color(0xFF6335D6), size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '$patient → $doctor',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _status(status),
-            ],
-          );
-
-          if (narrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                heading,
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.only(left: 52),
-                  child: Text(
-                    description,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF777384)),
-                  ),
-                ),
-                if (!compact)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: isBusy
-                        ? const Padding(
-                            padding: EdgeInsets.all(10),
-                            child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                          )
-                        : menu(),
-                  ),
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: Color(0xFFEFE7FF),
-                child: Icon(Icons.calendar_today, color: Color(0xFF6335D6), size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$patient → $doctor',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF777384)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              _status(status),
-              if (!compact) ...[
-                const SizedBox(width: 8),
-                isBusy
-                    ? const SizedBox(width: 40, height: 24, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
-                    : menu(),
-              ],
-            ],
-          );
-        },
-      ),
+    return AdminAppointmentCard(
+      patientName: (data['patientName'] ?? data['patientEmail'] ?? 'Patient').toString(),
+      doctorName: (data['doctorName'] ?? 'Doctor').toString(),
+      status: (data['status'] ?? 'pending').toString(),
+      dateLabel: dateLabel,
+      reason: (data['reason'] ?? '').toString(),
+      compact: compact,
+      busy: _busy.contains(busyKey),
+      onAction: (value) {
+        if (value == 'delete') {
+          _deleteAppointment(doc);
+        } else {
+          _setAppointmentStatus(doc.id, value);
+        }
+      },
     );
   }
   Widget _status(String value) {
