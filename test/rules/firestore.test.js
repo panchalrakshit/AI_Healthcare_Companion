@@ -65,14 +65,37 @@ test('patients cannot read other patients clinical records', async () => {
 });
 test('patient cancellation and assigned doctor status updates cannot reassign identities', async () => {
   const patientDb = user('patient'), doctorDb = user('doctor');
-  await assertSucceeds(updateDoc(doc(patientDb, 'appointments', 'one'), { status: 'cancelled' }));
-  await assertFails(updateDoc(doc(patientDb, 'appointments', 'one'), { status: 'completed' }));
+  await assertSucceeds(updateDoc(doc(patientDb, 'appointments', 'one'), { status: 'cancelled', updatedAt: Timestamp.now() }));
+  await assertFails(updateDoc(doc(patientDb, 'appointments', 'one'), { status: 'completed', updatedAt: Timestamp.now() }));
   await assertSucceeds(getDoc(doc(doctorDb, 'appointments', 'one')));
-  await assertFails(updateDoc(doc(doctorDb, 'appointments', 'one'), { status: 'confirmed' }));
+  await assertFails(updateDoc(doc(doctorDb, 'appointments', 'one'), { status: 'confirmed', updatedAt: Timestamp.now() }));
   await env.withSecurityRulesDisabled(async c => updateDoc(doc(c.firestore(), 'appointments', 'one'), { status: 'pending' }));
-  await assertSucceeds(updateDoc(doc(doctorDb, 'appointments', 'one'), { status: 'confirmed' }));
+  await assertSucceeds(updateDoc(doc(doctorDb, 'appointments', 'one'), { status: 'confirmed', updatedAt: Timestamp.now() }));
   await assertFails(updateDoc(doc(doctorDb, 'appointments', 'one'), { patientId: 'other' }));
 });
+test('patient appointment creation accepts only valid, bounded booking data', async () => {
+  const db = user('patient');
+  const valid = {
+    patientId: 'patient',
+    patientName: 'Patient',
+    patientEmail: 'patient@example.com',
+    doctorId: 'legacy-doctor',
+    doctorName: 'Doctor',
+    specialization: 'General Medicine',
+    status: 'pending',
+    createdAt: Timestamp.now(),
+    appointmentDate: Timestamp.fromDate(new Date('2026-12-01T10:00:00Z')),
+    appointmentTime: '10:00 AM',
+    reason: 'Routine consultation',
+  };
+  await assertSucceeds(setDoc(doc(db, 'appointments', 'valid-booking'), valid));
+  await assertFails(setDoc(doc(db, 'appointments', 'spoofed-patient'), { ...valid, patientId: 'other' }));
+  await assertFails(setDoc(doc(db, 'appointments', 'extra-field'), { ...valid, isAdmin: true }));
+  await assertFails(setDoc(doc(db, 'appointments', 'invalid-date'), { ...valid, appointmentDate: 'tomorrow' }));
+  await assertFails(setDoc(doc(db, 'appointments', 'wrong-status'), { ...valid, status: 'confirmed' }));
+  await assertFails(setDoc(doc(db, 'appointments', 'empty-reason'), { ...valid, reason: '' }));
+});
+
 test('booking suspended doctors and accessing data anonymously are blocked', async () => {
   await env.withSecurityRulesDisabled(async context => updateDoc(doc(context.firestore(), 'doctors', 'legacy-doctor'), { status: 'suspended' }));
   await assertFails(setDoc(doc(user('patient'), 'appointments', 'new'), { patientId: 'patient', doctorId: 'legacy-doctor', status: 'pending' }));
@@ -160,8 +183,8 @@ test('doctor may edit only own directory fields and cannot change identity or st
 test('doctor cannot complete pending visits or reopen completed visits', async () => {
   const db = user('doctor');
   await assertFails(updateDoc(doc(db, 'appointments', 'one'), { status: 'completed' }));
-  await assertSucceeds(updateDoc(doc(db, 'appointments', 'one'), { status: 'confirmed' }));
-  await assertSucceeds(updateDoc(doc(db, 'appointments', 'one'), { status: 'completed' }));
+  await assertSucceeds(updateDoc(doc(db, 'appointments', 'one'), { status: 'confirmed', updatedAt: Timestamp.now() }));
+  await assertSucceeds(updateDoc(doc(db, 'appointments', 'one'), { status: 'completed', updatedAt: Timestamp.now() }));
   await assertFails(updateDoc(doc(db, 'appointments', 'one'), { status: 'pending' }));
 });
 
