@@ -182,10 +182,10 @@ test('doctor may edit only own directory fields and cannot change identity or st
 });
 test('doctor cannot complete pending visits or reopen completed visits', async () => {
   const db = user('doctor');
-  await assertFails(updateDoc(doc(db, 'appointments', 'one'), { status: 'completed' }));
+  await assertFails(updateDoc(doc(db, 'appointments', 'one'), { status: 'completed', updatedAt: Timestamp.now() }));
   await assertSucceeds(updateDoc(doc(db, 'appointments', 'one'), { status: 'confirmed', updatedAt: Timestamp.now() }));
   await assertSucceeds(updateDoc(doc(db, 'appointments', 'one'), { status: 'completed', updatedAt: Timestamp.now() }));
-  await assertFails(updateDoc(doc(db, 'appointments', 'one'), { status: 'pending' }));
+  await assertFails(updateDoc(doc(db, 'appointments', 'one'), { status: 'pending', updatedAt: Timestamp.now() }));
 });
 
 test('patient measured-reading transaction saves only own history and profile', async () => {
